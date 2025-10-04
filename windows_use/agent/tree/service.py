@@ -140,11 +140,9 @@ class Tree:
                 elif not is_browser and node.ControlTypeName=="ImageControl" and is_keyboard_focusable(node):
                     return True
                 elif node.ControlTypeName in INTERACTIVE_CONTROL_TYPE_NAMES:
-                    if is_element_visible(node) and is_element_enabled(node) and (not is_element_image(node) or is_keyboard_focusable(node)):
-                        return True
+                    return is_element_visible(node) and is_element_enabled(node) and (not is_element_image(node) or is_keyboard_focusable(node))
                 elif is_browser and node.ControlTypeName=='GroupControl':
-                    if is_element_visible(node) and is_element_enabled(node) and (is_default_action(node) or is_keyboard_focusable(node)):
-                        return True
+                    return is_element_visible(node) and is_element_enabled(node) and (is_default_action(node) or is_keyboard_focusable(node))
                 # elif node.ControlTypeName=='GroupControl' and not is_browser:
                 #     if is_element_visible and is_element_enabled(node) and is_default_action(node):
                 #         return True

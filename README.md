@@ -50,13 +50,13 @@ pip install windows-use
 
 ```python
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from windows_use.agent import Agent, Browser
+from windows_use.agent import Agent
 from dotenv import load_dotenv
 
 load_dotenv()
 
 llm=ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite')
-agent = Agent(llm=llm,browser=Browser.CHROME)
+agent = Agent(llm=llm)
 agent.print_response("<YOUR TASK HERE>")
 ```
 
