@@ -177,7 +177,14 @@ class Tree:
                         control_type=node.LocalizedControlType,
                         value=value,
                         shortcut=node.AcceleratorKey,
-                        bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
+                        bounding_box=BoundingBox(
+                            left=box.left,
+                            top=box.top,
+                            right=box.right,
+                            bottom=box.bottom,
+                            width=box.width(),
+                            height=box.height()
+                        ),
                         center=center,
                         app_name=app_name
                     ))
@@ -195,7 +202,14 @@ class Tree:
                     control_type=control_type,
                     value=node.Name.strip(),
                     shortcut=node.AcceleratorKey,
-                    bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
+                    bounding_box=BoundingBox(
+                        left=box.left,
+                        top=box.top,
+                        right=box.right,
+                        bottom=box.bottom,
+                        width=box.width(),
+                        height=box.height()
+                    ),
                     center=center,
                     app_name=app_name
                 ))
@@ -215,7 +229,14 @@ class Tree:
                     name=node.Name.strip() or node.LocalizedControlType.capitalize() or "''",
                     app_name=app_name,
                     control_type=node.LocalizedControlType.title(),
-                    bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
+                    bounding_box=BoundingBox(
+                        left=box.left,
+                        top=box.top,
+                        right=box.right,
+                        bottom=box.bottom,
+                        width=box.width(),
+                        height=box.height()
+                    ),
                     center=center,
                     horizontal_scrollable=scroll_pattern.HorizontallyScrollable,
                     horizontal_scroll_percent=scroll_pattern.HorizontalScrollPercent if scroll_pattern.HorizontallyScrollable else 0,
@@ -230,28 +251,27 @@ class Tree:
                 box = node.BoundingRectangle
                 x,y=box.xcenter(),box.ycenter()
                 center = Center(x=x,y=y)
-                if is_dom:
-                    dom_interactive_nodes.append(TreeElementNode(
+                tree_node=TreeElementNode(
                         name=name,
                         control_type=node.LocalizedControlType.title(),
                         value=value,
                         shortcut=node.AcceleratorKey,
-                        bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
+                        bounding_box=BoundingBox(
+                            left=box.left,
+                            top=box.top,
+                            right=box.right,
+                            bottom=box.bottom,
+                            width=box.width(),
+                            height=box.height()
+                        ),
                         center=center,
                         app_name=app_name
-                    ))
-                else:
-                    interactive_nodes.append(TreeElementNode(
-                        name=name,
-                        control_type=node.LocalizedControlType.title(),
-                        value=value,
-                        shortcut=node.AcceleratorKey,
-                        bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
-                        center=center,
-                        app_name=app_name
-                    ))
+                    )
                 if is_browser and is_dom:
-                    dom_correction(node)
+                    dom_interactive_nodes.append(tree_node)
+                    dom_correction(node=node)
+                else:
+                    interactive_nodes.append(tree_node)
             elif is_element_text(node):
                 informative_nodes.append(TextElementNode(
                     name=node.Name.strip() or "''",
@@ -264,24 +284,13 @@ class Tree:
                 if is_browser and child.ClassName == "Chrome_RenderWidgetHostHWND":
                     # enter DOM subtree
                     tree_traversal(child, is_dom=True, is_dialog=is_dialog)
-                    if is_dialog:
-                        is_dialog = False  # reset dialog flag once DOM done
-                    continue
-
-                if child.ControlTypeName == "WindowControl":
-                    # new dialog found
-                    is_dialog = True
+                elif child.ControlTypeName == "WindowControl":
                     if is_dom:
                         dom_interactive_nodes.clear()
                     else:
                         interactive_nodes.clear()
-
-                    # traverse dialog fully before breaking
-                    tree_traversal(child, is_dom=is_dom, is_dialog=is_dialog)
-
-                    # now break after traversal completes
-                    break
-
+                    # enter dialog subtree
+                    tree_traversal(child, is_dom=is_dom, is_dialog=True)
                 else:
                     # normal non-dialog children
                     tree_traversal(child, is_dom=is_dom, is_dialog=is_dialog)
