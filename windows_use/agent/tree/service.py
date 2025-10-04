@@ -152,10 +152,10 @@ class Tree:
         
         def dom_correction(node:Control):
             if element_has_child_element(node,'list item','link') or element_has_child_element(node,'item','link'):
-                interactive_nodes.pop()
+                dom_interactive_nodes.pop()
                 return None
             elif node.ControlTypeName=='GroupControl':
-                interactive_nodes.pop()
+                dom_interactive_nodes.pop()
                 if is_keyboard_focusable(node):
                     child=node
                     try:
@@ -172,7 +172,7 @@ class Tree:
                     value=legacy_pattern.Value
                     x,y=box.xcenter(),box.ycenter()
                     center = Center(x=x,y=y)
-                    interactive_nodes.append(TreeElementNode(
+                    dom_interactive_nodes.append(TreeElementNode(
                         name=child.Name.strip(),
                         control_type=node.LocalizedControlType,
                         value=value,
@@ -182,7 +182,7 @@ class Tree:
                         app_name=app_name
                     ))
             elif element_has_child_element(node,'link','heading'):
-                interactive_nodes.pop()
+                dom_interactive_nodes.pop()
                 node=node.GetFirstChildControl()
                 control_type='link'
                 box = node.BoundingRectangle
@@ -190,7 +190,7 @@ class Tree:
                 value=legacy_pattern.Value
                 x,y=box.xcenter(),box.ycenter()
                 center = Center(x=x,y=y)
-                interactive_nodes.append(TreeElementNode(
+                dom_interactive_nodes.append(TreeElementNode(
                     name=node.Name.strip(),
                     control_type=control_type,
                     value=node.Name.strip(),
@@ -200,7 +200,7 @@ class Tree:
                     app_name=app_name
                 ))
             
-        def tree_traversal(node: Control):
+        def tree_traversal(node: Control,is_dom=False,is_dialog=False):
             # Checks to skip the nodes that are not interactive
             if node.IsOffscreen and (node.ControlTypeName not in set(["EditControl","TitleBarControl"])) and node.ClassName not in set(["Popup","Windows.UI.Core.CoreComponentInputSource"]):
                 return None
@@ -230,16 +230,27 @@ class Tree:
                 box = node.BoundingRectangle
                 x,y=box.xcenter(),box.ycenter()
                 center = Center(x=x,y=y)
-                interactive_nodes.append(TreeElementNode(
-                    name=name,
-                    control_type=node.LocalizedControlType.title(),
-                    value=value,
-                    shortcut=node.AcceleratorKey,
-                    bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
-                    center=center,
-                    app_name=app_name
-                ))
-                if is_browser:
+                if is_dom:
+                    dom_interactive_nodes.append(TreeElementNode(
+                        name=name,
+                        control_type=node.LocalizedControlType.title(),
+                        value=value,
+                        shortcut=node.AcceleratorKey,
+                        bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
+                        center=center,
+                        app_name=app_name
+                    ))
+                else:
+                    interactive_nodes.append(TreeElementNode(
+                        name=name,
+                        control_type=node.LocalizedControlType.title(),
+                        value=value,
+                        shortcut=node.AcceleratorKey,
+                        bounding_box=BoundingBox(left=box.left,top=box.top,right=box.right,bottom=box.bottom,width=box.width(),height=box.height()),
+                        center=center,
+                        app_name=app_name
+                    ))
+                if is_browser and is_dom:
                     dom_correction(node)
             elif is_element_text(node):
                 informative_nodes.append(TextElementNode(
@@ -247,15 +258,39 @@ class Tree:
                     app_name=app_name
                 ))
             
+            children=list(filter(lambda x:x.ControlTypeName=="WindowControl",node.GetChildren())) or node.GetChildren()
             # Recursively check all children
-            for child in node.GetChildren():
-                tree_traversal(child)
+            for child in children:
+                if is_browser and child.ClassName == "Chrome_RenderWidgetHostHWND":
+                    # enter DOM subtree
+                    tree_traversal(child, is_dom=True, is_dialog=is_dialog)
+                    if is_dialog:
+                        is_dialog = False  # reset dialog flag once DOM done
+                    continue
 
-        interactive_nodes, informative_nodes, scrollable_nodes = [], [], []
+                if child.ControlTypeName == "WindowControl":
+                    # new dialog found
+                    is_dialog = True
+                    if is_dom:
+                        dom_interactive_nodes.clear()
+                    else:
+                        interactive_nodes.clear()
+
+                    # traverse dialog fully before breaking
+                    tree_traversal(child, is_dom=is_dom, is_dialog=is_dialog)
+
+                    # now break after traversal completes
+                    break
+
+                else:
+                    # normal non-dialog children
+                    tree_traversal(child, is_dom=is_dom, is_dialog=is_dialog)
+
+        interactive_nodes, dom_interactive_nodes, informative_nodes, scrollable_nodes = [], [], [],[]
         app_name=node.Name.strip()
         app_name='Desktop' if node.ClassName=='Progman' else app_name
-
-        tree_traversal(node)
+        tree_traversal(node,is_dom=False,is_dialog=False)
+        interactive_nodes.extend(dom_interactive_nodes)
         return (interactive_nodes,informative_nodes,scrollable_nodes)
     
     def get_random_color(self):
