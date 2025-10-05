@@ -1,6 +1,6 @@
 from windows_use.agent.tree.config import INTERACTIVE_CONTROL_TYPE_NAMES,INFORMATIVE_CONTROL_TYPE_NAMES, DEFAULT_ACTIONS, THREAD_MAX_RETRIES
 from windows_use.agent.tree.views import TreeElementNode, TextElementNode, ScrollElementNode, Center, BoundingBox, TreeState
-from uiautomation import GetRootControl,Control,ImageControl,ScrollPattern
+from uiautomation import GetRootControl,Control,ImageControl,ScrollPattern,WindowControl
 from windows_use.agent.tree.utils import random_point_within_bounding_box
 from windows_use.agent.desktop.config import AVOIDED_APPS, EXCLUDED_APPS
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Tree:
     def __init__(self,desktop:'Desktop'):
         self.desktop=desktop
-        self.screen_resolution=self.desktop.get_screen_resolution()
+        self.screen_size=self.desktop.get_screen_resolution()
 
     def get_state(self)->TreeState:
         sleep(0.1)
@@ -278,17 +278,21 @@ class Tree:
                     app_name=app_name
                 ))
             
-            children=list(filter(lambda x:x.ControlTypeName=="WindowControl",node.GetChildren())) or node.GetChildren()
+            children=list(filter(lambda x: not is_browser and isinstance(x,WindowControl),node.GetChildren())) or node.GetChildren()
             # Recursively check all children
             for child in children:
                 if is_browser and child.ClassName == "Chrome_RenderWidgetHostHWND":
                     # enter DOM subtree
                     tree_traversal(child, is_dom=True, is_dialog=is_dialog)
-                elif child.ControlTypeName == "WindowControl":
-                    if is_dom:
-                        dom_interactive_nodes.clear()
-                    else:
-                        interactive_nodes.clear()
+                elif isinstance(child,WindowControl):
+                    if not is_keyboard_focusable(child):
+                        if is_dom:
+                            bounding_box=child.BoundingRectangle
+                            if bounding_box.width() > 0.6*self.screen_size.width:
+                                # Because this window element covers the majority of the screen
+                                dom_interactive_nodes.clear()
+                        else:
+                            interactive_nodes.clear()
                     # enter dialog subtree
                     tree_traversal(child, is_dom=is_dom, is_dialog=True)
                 else:
