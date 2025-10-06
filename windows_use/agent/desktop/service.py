@@ -27,6 +27,7 @@ except Exception:
 
 import uiautomation as uia
 import pyautogui as pg
+
 pg.FAILSAFE=False
 pg.PAUSE=1.0
 
@@ -208,6 +209,7 @@ class Desktop:
         else:
             pass
         if clear=='true':
+            pg.sleep(0.5)
             pg.hotkey('ctrl','a')
             pg.press('backspace')
         pg.typewrite(text,interval=0.02)
@@ -270,11 +272,16 @@ class Desktop:
             pg.sleep(0.5)
         pg.keyUp('ctrl')
     
+    def multi_edit(self,elements:list[tuple[int,int,str]]):
+        for element in elements:
+            x,y,text=element
+            self.type((x,y),text=text,clear='true')
+    
     def scrape(self,url:str)->str:
         response=requests.get(url,timeout=10)
         html=response.text
         content=markdownify(html=html)
-        return f'Scraped the contents of the entire webpage:\n{content}'
+        return content
     
     def get_app_size(self,control:Control):
         window=control.BoundingRectangle

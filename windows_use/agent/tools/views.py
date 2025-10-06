@@ -130,6 +130,13 @@ class MultiSelect(SharedBaseModel):
         examples=[[(640, 360), (800, 400)], [(100, 200), (200, 300)]]
     )
 
+class MultiEdit(SharedBaseModel):
+    elements: list[tuple[int, int, str]] = Field(
+        ...,
+        description="List of (x, y, text) pixel coordinates within the target element's bounding box for multiple editing",
+        examples=[[(640, 360, 'hello'), (800, 400, 'world')], [(100, 200, 'foo'), (200, 300, 'bar')]]
+    )
+
 class Scroll(SharedBaseModel):
     loc: tuple[int, int] | None = Field(
         description="(x, y) pixel coordinates where scroll action occurs. If None, scrolls at current cursor position",

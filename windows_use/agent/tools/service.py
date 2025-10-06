@@ -1,4 +1,4 @@
-from windows_use.agent.tools.views import Click, Type, Scroll, Drag, Move, Shortcut, Wait, Scrape, Done, Shell, Memory, App, MultiSelect
+from windows_use.agent.tools.views import Click, Type, Scroll, Drag, Move, Shortcut, Wait, Scrape, Done, Shell, Memory, App, MultiSelect, MultiEdit
 from windows_use.agent.desktop.service import Desktop
 from typing import Literal,Optional
 from langchain.tools import tool
@@ -280,19 +280,34 @@ def shortcut_tool(shortcut:str,**kwargs)->str:
 @tool('Multi Select Tool',args_schema=MultiSelect)
 def multi_select_tool(elements:list[tuple[int,int]],**kwargs)->str:
     '''
-    Simulates holding down the Ctrl key and clicking on multiple elements.
+    Holding down the Ctrl key and clicking on multiple elements.
     
     Use cases:
         - Select multiple items in a list, table, or grid
         - Mark multiple checkboxes in a form
         - Drag-and-drop multiple items between locations
     
-    Simulates holding down the Ctrl key and clicking on multiple elements, enabling 
-    multiple selection and drag-and-drop operations.
+    Holding down the Ctrl key and clicking on multiple elements, enabling multiple selection and drag-and-drop operations.
     '''
     desktop:Desktop=kwargs['desktop']
     desktop.multi_select(elements)
     return f'Multi-selected elements at {'\n'.join([f'({x},{y})' for x,y in elements])}.'
+
+@tool('Multi Edit Tool',args_schema=MultiEdit)
+def multi_edit_tool(elements:list[tuple[int,int,str]],**kwargs)->str:
+    '''
+    Typing text into multiple input fields.
+    
+    Use cases:
+        - Enter text into multiple text boxes
+        - Fill in forms with multiple fields
+        - Edit multiple lines of text
+    
+    Typing text into multiple input fields, text areas.
+    '''
+    desktop:Desktop=kwargs['desktop']
+    desktop.multi_edit(elements)
+    return f'Multi-edited elements at {','.join([f'({x},{y}) text={text}' for x,y,text in elements])}.'
 
 @tool('Wait Tool',args_schema=Wait)
 def wait_tool(duration:int,**kwargs)->str:
