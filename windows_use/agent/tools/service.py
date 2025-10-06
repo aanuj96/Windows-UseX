@@ -1,15 +1,9 @@
 from windows_use.agent.tools.views import Click, Type, Scroll, Drag, Move, Shortcut, Wait, Scrape, Done, Shell, Memory, App
 from windows_use.agent.desktop.service import Desktop
-from markdownify import markdownify
 from typing import Literal,Optional
 from langchain.tools import tool
-import uiautomation as uia
 from pathlib import Path
-import pyautogui as pg
-import requests
-
-pg.FAILSAFE=False
-pg.PAUSE=1.0
+from time import sleep
 
 memory_path=Path.cwd()/'.memories'
 
@@ -37,30 +31,7 @@ def app_tool(mode:Literal['launch','resize','switch'],name:Optional[str]=None,lo
     Use this tool to control application lifecycle and window management during task execution.
     '''
     desktop:Desktop=kwargs['desktop']
-    match mode:
-        case 'launch':
-            response,status=desktop.launch_app(name)
-            if status!=0:
-                return response
-            consecutive_waits=3
-            for _ in range(consecutive_waits):
-                if not desktop.is_app_running(name):
-                    pg.sleep(1.25)
-                else:
-                    return f'{name.title()} launched.'
-            return f'Launching {name.title()} wait for it to come load.'
-        case 'resize':
-            _,status=desktop.resize_app(size=size,loc=loc)
-            if status!=0:
-                return f'Failed to resize window.'
-            else:
-                return f'Window resized successfully.'
-        case 'switch':
-            _,status=desktop.switch_app(name)
-            if status!=0:
-                return f'Failed to switch to {name.title()} window.'
-            else:
-                return f'Switched to {name.title()} window.'
+    return desktop.app(mode,name,loc,size)
 
 @tool('Memory Tool',args_schema=Memory)
 def memory_tool(mode: Literal['view','read','write','delete','update'],path: Optional[str] = None,
@@ -205,20 +176,8 @@ def click_tool(loc:tuple[int,int],button:Literal['left','right','middle']='left'
     for reliable interaction. Essential for all point-and-click UI operations.
     '''
     x,y=loc
-    pg.moveTo(x,y)
-    pg.sleep(0.05)
     desktop:Desktop=kwargs['desktop']
-    control=desktop.get_element_under_cursor()
-    parent=control.GetParentControl()
-    if parent.Name=="Desktop":
-        pg.click(x=x,y=y,button=button,clicks=clicks)
-    else:
-        pg.mouseDown()
-        if clicks==2 and button=='left':
-            pg.click(clicks=1)
-        pg.click(button=button,clicks=clicks)
-        pg.mouseUp()
-    pg.sleep(0.1)
+    desktop.click(loc,button,clicks)
     num_clicks={1:'Single',2:'Double',3:'Triple'}
     return f'{num_clicks.get(clicks)} {button} at ({x},{y}).'
 
@@ -237,20 +196,8 @@ def type_tool(loc:tuple[int,int],text:str,clear:Literal['true','false']='false',
     Always click on the target element coordinates first to ensure proper focus.
     '''
     x,y=loc
-    pg.leftClick(x,y)
-    if caret_position == 'start':
-        pg.press('home')
-    elif caret_position == 'end':
-        pg.press('end')
-    else:
-        pass
-    if clear=='true':
-        pg.hotkey('ctrl','a')
-        pg.press('backspace')
-    pg.typewrite(text,interval=0.02)
-    pg.sleep(0.05)
-    if press_enter=='true':
-        pg.press('enter')
+    desktop:Desktop=kwargs['desktop']
+    desktop.type(loc,text,clear,caret_position,press_enter)
     return f'Typed {text} at ({x},{y}).'
 
 @tool('Scroll Tool',args_schema=Scroll)
@@ -269,36 +216,10 @@ def scroll_tool(loc:tuple[int,int]=None,type:Literal['horizontal','vertical']='v
     
     Essential tool for accessing content beyond the visible viewport.
     '''
-    if loc:
-        x,y=loc
-        pg.moveTo(x,y)
-    match type:
-        case 'vertical':
-            match direction:
-                case 'up':
-                    uia.WheelUp(wheel_times)
-                case 'down':
-                    uia.WheelDown(wheel_times)
-                case _:
-                    return 'Invalid direction. Use "up" or "down".'
-        case 'horizontal':
-            match direction:
-                case 'left':
-                    pg.keyDown('Shift')
-                    pg.sleep(0.05)
-                    uia.WheelUp(wheel_times)
-                    pg.sleep(0.05)
-                    pg.keyUp('Shift')
-                case 'right':
-                    pg.keyDown('Shift')
-                    pg.sleep(0.05)
-                    uia.WheelDown(wheel_times)
-                    pg.sleep(0.05)
-                    pg.keyUp('Shift')
-                case _:
-                    return 'Invalid direction. Use "left" or "right".'
-        case _:
-            return 'Invalid type. Use "horizontal" or "vertical".'
+    desktop:Desktop=kwargs['desktop']
+    response=desktop.scroll(loc,type,direction,wheel_times)
+    if response:
+        return response
     return f'Scrolled {type} {direction} by {wheel_times} wheel times.'
 
 @tool('Drag Tool',args_schema=Drag)
@@ -317,9 +238,8 @@ def drag_tool(from_loc:tuple[int,int],to_loc:tuple[int,int],**kwargs)->str:
     '''
     x1,y1=from_loc
     x2,y2=to_loc
-    pg.moveTo(x1,y1)
-    pg.sleep(0.01)
-    pg.dragTo(x2,y2)
+    desktop:Desktop=kwargs['desktop']
+    desktop.drag(from_loc,to_loc)
     return f'Dragged the element from ({x1},{y1}) to ({x2},{y2}).'
 
 @tool('Move Tool',args_schema=Move)
@@ -336,8 +256,8 @@ def move_tool(to_loc:tuple[int,int],**kwargs)->str:
     Non-invasive cursor positioning for setup and hover-based interactions.
     '''
     x,y=to_loc
-    pg.moveTo(x,y)
-    pg.sleep(0.01)
+    desktop:Desktop=kwargs['desktop']
+    desktop.move(to_loc)
     return f'Moved the mouse pointer to ({x},{y}).'
 
 @tool('Shortcut Tool',args_schema=Shortcut)
@@ -354,12 +274,9 @@ def shortcut_tool(shortcut:str,**kwargs)->str:
     and application-specific shortcuts. More efficient than mouse-based navigation 
     for many operations.
     '''
-    shortcut=shortcut.split('+')
-    if len(shortcut)>1:
-        pg.hotkey(*shortcut)
-    else:
-        pg.press(''.join(shortcut))
-    return f'Pressed {'+'.join(shortcut)}.'
+    desktop:Desktop=kwargs['desktop']
+    desktop.shortcut(shortcut)
+    return f'Pressed {shortcut}.'
 
 @tool('Wait Tool',args_schema=Wait)
 def wait_tool(duration:int,**kwargs)->str:
@@ -375,7 +292,7 @@ def wait_tool(duration:int,**kwargs)->str:
     Use strategic waits to improve reliability when operations need time to complete.
     Duration is specified in seconds.
     '''
-    pg.sleep(duration)
+    sleep(duration)
     return f'Waited for {duration} seconds.'
 
 @tool('Scrape Tool',args_schema=Scrape)
@@ -392,7 +309,6 @@ def scrape_tool(url:str,**kwargs)->str:
     Requires full URL including protocol (http:// or https://). Returns structured 
     markdown text suitable for parsing, analysis, and information extraction.
     '''
-    response=requests.get(url,timeout=10)
-    html=response.text
-    content=markdownify(html=html)
+    desktop:Desktop=kwargs['desktop']
+    content=desktop.scrape(url)
     return f'Scraped the contents of the entire webpage:\n{content}'

@@ -1,6 +1,6 @@
 from windows_use.agent.tree.config import INTERACTIVE_CONTROL_TYPE_NAMES,INFORMATIVE_CONTROL_TYPE_NAMES, DEFAULT_ACTIONS, THREAD_MAX_RETRIES
 from windows_use.agent.tree.views import TreeElementNode, TextElementNode, ScrollElementNode, Center, BoundingBox, TreeState
-from uiautomation import GetRootControl,Control,ImageControl,ScrollPattern,WindowControl
+from uiautomation import Control,ImageControl,ScrollPattern,WindowControl
 from windows_use.agent.tree.utils import random_point_within_bounding_box
 from windows_use.agent.desktop.config import AVOIDED_APPS, EXCLUDED_APPS
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,10 +17,8 @@ class Tree:
         self.desktop=desktop
         self.screen_size=self.desktop.get_screen_resolution()
 
-    def get_state(self)->TreeState:
+    def get_state(self,root:Control)->TreeState:
         sleep(0.1)
-        # Get the root control of the desktop
-        root=GetRootControl()
         interactive_nodes,informative_nodes,scrollable_nodes=self.get_appwise_nodes(node=root)
         return TreeState(interactive_nodes=interactive_nodes,informative_nodes=informative_nodes,scrollable_nodes=scrollable_nodes)
 

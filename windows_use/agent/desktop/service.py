@@ -5,30 +5,41 @@ from windows_use.agent.tree.service import Tree
 from PIL.Image import Image as PILImage
 from locale import getpreferredencoding
 from contextlib import contextmanager
+from typing import Optional,Literal
+from markdownify import markdownify
 from fuzzywuzzy import process
-from typing import Optional
 from psutil import Process
 from time import sleep
 from io import BytesIO
 from PIL import Image
 import subprocess
-import pyautogui
+import requests
 import ctypes
 import base64
 import csv
 import os
 import io
 
+try:  
+    ctypes.windll.shcore.SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE)
+except Exception:  
+    ctypes.windll.user32.SetProcessDPIAware()  
+
+import uiautomation as uia
+import pyautogui as pg
+pg.FAILSAFE=False
+pg.PAUSE=1.0
+
 class Desktop:
     def __init__(self):
-        ctypes.windll.shcore.SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE)
         self.encoding=getpreferredencoding()
         self.desktop_state=None
         
     def get_state(self,use_vision:bool=False)->DesktopState:
         tree=Tree(self)
         active_app,apps=self.get_apps()
-        tree_state=tree.get_state()
+        root=GetRootControl()
+        tree_state=tree.get_state(root=root)
         if use_vision:
             annotated_screenshot=tree.annotated_screenshot(tree_state.interactive_nodes,scale=0.5)
             screenshot=self.screenshot_in_bytes(annotated_screenshot)
@@ -60,7 +71,7 @@ class Desktop:
             return Status.HIDDEN
     
     def get_cursor_location(self)->tuple[int,int]:
-        position=pyautogui.position()
+        position=pg.position()
         return (position.x,position.y)
     
     def get_element_under_cursor(self)->Control:
@@ -125,6 +136,32 @@ class Desktop:
     def is_app_running(self,name:str)->bool:
         apps={app.name:app for app in [self.desktop_state.active_app]+self.desktop_state.apps if app is not None}
         return process.extractOne(name,list(apps.keys()),score_cutoff=60) is not None
+    
+    def app(self,mode:Literal['launch','switch','resize'],name:Optional[str]=None,loc:Optional[tuple[int,int]]=None,size:Optional[tuple[int,int]]=None):
+        match mode:
+            case 'launch':
+                response,status=self.launch_app(name)
+                if status!=0:
+                    return response
+                consecutive_waits=3
+                for _ in range(consecutive_waits):
+                    if not self.is_app_running(name):
+                        sleep(1.25)
+                    else:
+                        return f'{name.title()} launched.'
+                return f'Launching {name.title()} wait for it to come load.'
+            case 'resize':
+                _,status=self.resize_app(size=size,loc=loc)
+                if status!=0:
+                    return f'Failed to resize window.'
+                else:
+                    return f'Window resized successfully.'
+            case 'switch':
+                _,status=self.switch_app(name)
+                if status!=0:
+                    return f'Failed to switch to {name.title()} window.'
+                else:
+                    return f'Switched to {name.title()} window.'
         
     def launch_app(self,name:str)->tuple[str,int]:
         apps_map=self.get_apps_from_start_menu()
@@ -156,6 +193,102 @@ class Desktop:
             app=Application().connect(handle=app.handle)
             app.window().set_focus()
             return (f'Switched to {app_name.title()} window.',0)
+        
+    def click(self,loc:tuple[int,int],button:str='left',clicks:int=2):
+        x,y=loc
+        self.move(loc)
+        control=self.get_element_under_cursor()
+        parent=control.GetParentControl()
+        if parent.Name=="Desktop":
+            pg.click(x=x,y=y,button=button,clicks=clicks)
+        else:
+            pg.mouseDown()
+            if clicks==2 and button=='left':
+                pg.click(clicks=1)
+            pg.click(button=button,clicks=clicks)
+            pg.mouseUp()
+        pg.sleep(0.1)
+
+    def type(self,loc:tuple[int,int],text:str,caret_position:Literal['start','end','none']='none',clear:Literal['true','false']='false',press_enter:Literal['true','false']='false'):
+        x,y=loc
+        pg.leftClick(x,y)
+        if caret_position == 'start':
+            pg.press('home')
+        elif caret_position == 'end':
+            pg.press('end')
+        else:
+            pass
+        if clear=='true':
+            pg.hotkey('ctrl','a')
+            pg.press('backspace')
+        pg.typewrite(text,interval=0.02)
+        pg.sleep(0.05)
+        if press_enter=='true':
+            pg.press('enter')
+
+    def scroll(self,loc:tuple[int,int]=None,type:Literal['horizontal','vertical']='vertical',direction:Literal['up','down','left','right']='down',wheel_times:int=1)->str|None:
+        if loc:
+            self.move(loc)
+        match type:
+            case 'vertical':
+                match direction:
+                    case 'up':
+                        uia.WheelUp(wheel_times)
+                    case 'down':
+                        uia.WheelDown(wheel_times)
+                    case _:
+                        return 'Invalid direction. Use "up" or "down".'
+            case 'horizontal':
+                match direction:
+                    case 'left':
+                        pg.keyDown('Shift')
+                        pg.sleep(0.05)
+                        uia.WheelUp(wheel_times)
+                        pg.sleep(0.05)
+                        pg.keyUp('Shift')
+                    case 'right':
+                        pg.keyDown('Shift')
+                        pg.sleep(0.05)
+                        uia.WheelDown(wheel_times)
+                        pg.sleep(0.05)
+                        pg.keyUp('Shift')
+                    case _:
+                        return 'Invalid direction. Use "left" or "right".'
+            case _:
+                return 'Invalid type. Use "horizontal" or "vertical".'
+        return None
+    
+    def drag(self,from_loc:tuple[int,int],to_loc:tuple[int,int]):
+        x2,y2=to_loc
+        self.move(from_loc)
+        pg.dragTo(x2,y2)
+
+    def move(self,loc:tuple[int,int]):
+        x,y=loc
+        pg.sleep(0.01)
+        pg.moveTo(x,y)
+        pg.sleep(0.01)
+
+    def shortcut(self,shortcut:str):
+        shortcut=shortcut.split('+')
+        if len(shortcut)>1:
+            pg.hotkey(*shortcut)
+        else:
+            pg.press(''.join(shortcut))
+
+    def multi_select(self,elements:list[tuple[int,int]]):
+        pg.keyDown('Ctrl')
+        pg.sleep(0.01)
+        for element in elements:
+            x,y=element
+            self.click((x,y))
+        pg.keyUp('Ctrl')
+    
+    def scrape(self,url:str)->str:
+        response=requests.get(url,timeout=10)
+        html=response.text
+        content=markdownify(html=html)
+        return f'Scraped the contents of the entire webpage:\n{content}'
     
     def get_app_size(self,control:Control):
         window=control.BoundingRectangle
@@ -225,7 +358,7 @@ class Desktop:
         return data_uri
 
     def get_screenshot(self,scale:float=0.7)->Image.Image:
-        screenshot=pyautogui.screenshot()
+        screenshot=pg.screenshot()
         size=(screenshot.width*scale, screenshot.height*scale)
         screenshot.thumbnail(size=size, resample=Image.Resampling.LANCZOS)
         return screenshot
