@@ -196,18 +196,7 @@ class Desktop:
         
     def click(self,loc:tuple[int,int],button:str='left',clicks:int=2):
         x,y=loc
-        self.move(loc)
-        control=self.get_element_under_cursor()
-        parent=control.GetParentControl()
-        if parent.Name=="Desktop":
-            pg.click(x=x,y=y,button=button,clicks=clicks)
-        else:
-            pg.mouseDown()
-            if clicks==2 and button=='left':
-                pg.click(clicks=1)
-            pg.click(button=button,clicks=clicks)
-            pg.mouseUp()
-        pg.sleep(0.1)
+        pg.click(x,y,button=button,clicks=clicks,duration=0.1)
 
     def type(self,loc:tuple[int,int],text:str,caret_position:Literal['start','end','none']='none',clear:Literal['true','false']='false',press_enter:Literal['true','false']='false'):
         x,y=loc
@@ -222,7 +211,6 @@ class Desktop:
             pg.hotkey('ctrl','a')
             pg.press('backspace')
         pg.typewrite(text,interval=0.02)
-        pg.sleep(0.05)
         if press_enter=='true':
             pg.press('enter')
 
@@ -258,16 +246,14 @@ class Desktop:
                 return 'Invalid type. Use "horizontal" or "vertical".'
         return None
     
-    def drag(self,from_loc:tuple[int,int],to_loc:tuple[int,int]):
-        x2,y2=to_loc
-        self.move(from_loc)
-        pg.dragTo(x2,y2)
+    def drag(self,loc:tuple[int,int]):
+        x,y=loc
+        pg.sleep(0.5)
+        pg.dragTo(x,y,duration=0.6)
 
     def move(self,loc:tuple[int,int]):
         x,y=loc
-        pg.sleep(0.01)
-        pg.moveTo(x,y)
-        pg.sleep(0.01)
+        pg.moveTo(x,y,duration=0.1)
 
     def shortcut(self,shortcut:str):
         shortcut=shortcut.split('+')
@@ -277,12 +263,12 @@ class Desktop:
             pg.press(''.join(shortcut))
 
     def multi_select(self,elements:list[tuple[int,int]]):
-        pg.keyDown('Ctrl')
-        pg.sleep(0.01)
+        pg.keyDown('ctrl')
         for element in elements:
             x,y=element
-            self.click((x,y))
-        pg.keyUp('Ctrl')
+            pg.click(x,y,duration=0.2)
+            pg.sleep(0.5)
+        pg.keyUp('ctrl')
     
     def scrape(self,url:str)->str:
         response=requests.get(url,timeout=10)

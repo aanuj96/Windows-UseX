@@ -123,6 +123,13 @@ class Type(SharedBaseModel):
         examples=['true', 'false']
     )
 
+class MultiSelect(SharedBaseModel):
+    elements: list[tuple[int, int]] = Field(
+        ...,
+        description="List of (x, y) pixel coordinates within the target element's bounding box for multiple selection",
+        examples=[[(640, 360), (800, 400)], [(100, 200), (200, 300)]]
+    )
+
 class Scroll(SharedBaseModel):
     loc: tuple[int, int] | None = Field(
         description="(x, y) pixel coordinates where scroll action occurs. If None, scrolls at current cursor position",
@@ -146,19 +153,14 @@ class Scroll(SharedBaseModel):
     )
 
 class Drag(SharedBaseModel):
-    from_loc: tuple[int, int] = Field(
+    loc: tuple[int, int] = Field(
         ...,
-        description="(x, y) pixel coordinates of drag operation starting point",
-        examples=[(100, 100), (300, 200)]
-    )
-    to_loc: tuple[int, int] = Field(
-        ...,
-        description="(x, y) pixel coordinates of drag operation ending point/destination",
+        description="(x, y) pixel coordinates of drag operation destination",
         examples=[(500, 500), (800, 600)]
     )
 
 class Move(SharedBaseModel):
-    to_loc: tuple[int, int] = Field(
+    loc: tuple[int, int] = Field(
         ...,
         description="(x, y) pixel coordinates to move mouse cursor to without clicking. Used for hovering or positioning",
         examples=[(640, 360), (100, 100)]

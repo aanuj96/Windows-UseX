@@ -1,4 +1,4 @@
-from windows_use.agent.tools.views import Click, Type, Scroll, Drag, Move, Shortcut, Wait, Scrape, Done, Shell, Memory, App
+from windows_use.agent.tools.views import Click, Type, Scroll, Drag, Move, Shortcut, Wait, Scrape, Done, Shell, Memory, App, MultiSelect
 from windows_use.agent.desktop.service import Desktop
 from typing import Literal,Optional
 from langchain.tools import tool
@@ -223,9 +223,9 @@ def scroll_tool(loc:tuple[int,int]=None,type:Literal['horizontal','vertical']='v
     return f'Scrolled {type} {direction} by {wheel_times} wheel times.'
 
 @tool('Drag Tool',args_schema=Drag)
-def drag_tool(from_loc:tuple[int,int],to_loc:tuple[int,int],**kwargs)->str:
+def drag_tool(loc:tuple[int,int],**kwargs)->str:
     '''
-    Performs drag-and-drop operations from source to destination coordinates.
+    Performs drag-and-drop operations from current location of cursor to destination coordinates.
     
     Common use cases:
         - Move files and folders between locations
@@ -233,17 +233,16 @@ def drag_tool(from_loc:tuple[int,int],to_loc:tuple[int,int],**kwargs)->str:
         - Rearrange UI elements that support drag-and-drop
         - Select text or multiple items by dragging
     
-    Simulates holding down the mouse button at the source location and releasing 
+    Simulates holding down the mouse button at the current location of the cursor and releasing 
     at the destination, enabling drag-based interactions.
     '''
-    x1,y1=from_loc
-    x2,y2=to_loc
+    x,y=loc
     desktop:Desktop=kwargs['desktop']
-    desktop.drag(from_loc,to_loc)
-    return f'Dragged the element from ({x1},{y1}) to ({x2},{y2}).'
+    desktop.drag(loc)
+    return f'Dragged the selected element to ({x},{y}).'
 
 @tool('Move Tool',args_schema=Move)
-def move_tool(to_loc:tuple[int,int],**kwargs)->str:
+def move_tool(loc:tuple[int,int],**kwargs)->str:
     '''
     Moves mouse cursor to specific coordinates without performing any click action.
     
@@ -255,9 +254,9 @@ def move_tool(to_loc:tuple[int,int],**kwargs)->str:
     
     Non-invasive cursor positioning for setup and hover-based interactions.
     '''
-    x,y=to_loc
+    x,y=loc
     desktop:Desktop=kwargs['desktop']
-    desktop.move(to_loc)
+    desktop.move(loc)
     return f'Moved the mouse pointer to ({x},{y}).'
 
 @tool('Shortcut Tool',args_schema=Shortcut)
@@ -277,6 +276,23 @@ def shortcut_tool(shortcut:str,**kwargs)->str:
     desktop:Desktop=kwargs['desktop']
     desktop.shortcut(shortcut)
     return f'Pressed {shortcut}.'
+
+@tool('Multi Select Tool',args_schema=MultiSelect)
+def multi_select_tool(elements:list[tuple[int,int]],**kwargs)->str:
+    '''
+    Simulates holding down the Ctrl key and clicking on multiple elements.
+    
+    Use cases:
+        - Select multiple items in a list, table, or grid
+        - Mark multiple checkboxes in a form
+        - Drag-and-drop multiple items between locations
+    
+    Simulates holding down the Ctrl key and clicking on multiple elements, enabling 
+    multiple selection and drag-and-drop operations.
+    '''
+    desktop:Desktop=kwargs['desktop']
+    desktop.multi_select(elements)
+    return f'Multi-selected elements at {'\n'.join([f'({x},{y})' for x,y in elements])}.'
 
 @tool('Wait Tool',args_schema=Wait)
 def wait_tool(duration:int,**kwargs)->str:
