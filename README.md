@@ -48,66 +48,44 @@ pip install windows-use
 
 ## ⚙️Basic Usage
 
-### OpenRouter API ile (Önerilen)
+### OpenRouter
 
 ```python
-from windows_use.agent import Agent
-from windows_use.agent.llm import OpenRouterLLM
+from windows_use.llm.openrouter import ChatOpenRouter
+from windows_use.agent import Agent, Browser
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
-# OpenRouter API kullanımı
-llm = OpenRouterLLM(
-    model="openai/gpt-4o",
-    temperature=0.2,
-    max_tokens=4000
-)
-agent = Agent(llm=llm)
-agent.print_response("<YOUR TASK HERE>")
+def main():
+    api_key=os.getenv("OPENROUTER_API_KEY")
+    llm = ChatOpenRouter(model="openai/gpt-4o",api_key=api_key)
+    agent = Agent(llm=llm, browser=Browser.EDGE, use_vision=False, auto_minimize=True)
+    agent.print_response(query=input("Enter a query: "))
+
+if __name__ == "__main__":
+    main()
 ```
 
-### Google Gemini ile
+### Google Gemini 
 
 ```python
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from windows_use.agent import Agent
+from windows_use.agent import Agent, Browser
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
-llm=ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite')
-agent = Agent(llm=llm)
-agent.print_response("<YOUR TASK HERE>")
+def main():
+    llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash', temperature=0.2)
+    agent = Agent(llm=llm, browser=Browser.EDGE, use_vision=False, auto_minimize=True)
+    agent.print_response(query=input("Enter a query: "))
+
+if __name__ == "__main__":
+    main()
 ```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-`.env` dosyası oluşturun ve aşağıdaki değişkenleri ekleyin:
-
-```env
-# OpenRouter API Configuration
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-OPENROUTER_MODEL=openai/gpt-4o
-OPENROUTER_TEMPERATURE=0.2
-OPENROUTER_MAX_TOKENS=4000
-
-# Google Gemini Configuration (optional, for fallback)
-GOOGLE_API_KEY=your_google_api_key_here
-```
-
-### Desteklenen Modeller
-
-OpenRouter API ile aşağıdaki modelleri kullanabilirsiniz:
-
-- `openai/gpt-4o` - OpenAI GPT-4o
-- `openai/gpt-4o-mini` - OpenAI GPT-4o Mini
-- `anthropic/claude-3.5-sonnet` - Anthropic Claude 3.5 Sonnet
-- `meta-llama/llama-3.1-8b-instruct` - Meta Llama 3.1 8B
-- Ve daha fazlası... [OpenRouter Model Listesi](https://openrouter.ai/models)
 
 ## 🤖 Run Agent
 

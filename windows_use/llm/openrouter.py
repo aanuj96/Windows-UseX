@@ -1,5 +1,5 @@
 """
-OpenRouter API entegrasyonu için LangChain uyumlu LLM sınıfı
+LangChain-compatible LLM class for OpenRouter API integration
 """
 import requests
 import json
@@ -15,9 +15,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-class OpenRouterLLM(BaseChatModel):
+class ChatOpenRouter(BaseChatModel):
     """
-    OpenRouter API için LangChain uyumlu LLM sınıfı
+    LangChain-compatible LLM class for OpenRouter API
     """
     
     api_key: str = Field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
@@ -35,12 +35,12 @@ class OpenRouterLLM(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        """OpenRouter API'ye istek gönder ve yanıt al"""
+        """Send a request to the OpenRouter API and return the response"""
         
         if not self.api_key:
             raise ValueError("OPENROUTER_API_KEY environment variable is required")
         
-        # LangChain mesajlarını OpenRouter formatına dönüştür
+        # Convert LangChain messages into OpenRouter format
         openrouter_messages = []
         for message in messages:
             if isinstance(message, HumanMessage):
@@ -50,7 +50,7 @@ class OpenRouterLLM(BaseChatModel):
             elif isinstance(message, SystemMessage):
                 openrouter_messages.append({"role": "system", "content": message.content})
         
-        # API isteği için payload hazırla
+        # Prepare payload for the API request
         payload = {
             "model": self.model,
             "messages": openrouter_messages,
@@ -63,7 +63,7 @@ class OpenRouterLLM(BaseChatModel):
         if stop:
             payload["stop"] = stop
             
-        # Headers hazırla
+        # Prepare headers
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -75,7 +75,7 @@ class OpenRouterLLM(BaseChatModel):
             headers["X-Title"] = self.site_title
             
         try:
-            # API isteği gönder
+            # Send POST request to the OpenRouter API
             response = requests.post(
                 self.base_url,
                 headers=headers,
@@ -84,7 +84,7 @@ class OpenRouterLLM(BaseChatModel):
             )
             response.raise_for_status()
             
-            # Yanıtı işle
+            # Parse response
             response_data = response.json()
             
             if "choices" not in response_data or not response_data["choices"]:
@@ -93,13 +93,13 @@ class OpenRouterLLM(BaseChatModel):
             choice = response_data["choices"][0]
             content = choice["message"]["content"]
             
-            # Emoji karakterlerini temizle (Windows encoding sorunları için)
+            # Clean up emoji characters (to avoid encoding issues on Windows)
             try:
                 content = content.encode('ascii', 'ignore').decode('ascii')
             except:
                 pass
             
-            # LangChain formatına dönüştür
+            # Convert response to LangChain format
             message = AIMessage(content=content)
             generation = ChatGeneration(message=message)
             
@@ -117,8 +117,8 @@ class OpenRouterLLM(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGeneration]:
-        """Streaming desteği - şimdilik desteklenmiyor"""
-        # Streaming henüz desteklenmiyor, normal generate kullan
+        """Streaming support — currently not implemented"""
+        # Streaming not yet supported; fallback to regular generation
         result = self._generate(messages, stop, run_manager, **kwargs)
         yield result.generations[0]
     
