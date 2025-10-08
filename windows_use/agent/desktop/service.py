@@ -17,6 +17,7 @@ import requests
 import ctypes
 import base64
 import csv
+import re
 import os
 import io
 
@@ -321,6 +322,48 @@ class Desktop:
         active_app=self.get_active_app(apps)
         apps=apps[1:] if len(apps)>1 else []
         return (active_app,apps)
+    
+    def get_xpath_from_element(self,element:Control):
+        current=element
+        if current is None:
+            return ""
+        path_parts=[]
+        while current is not None:
+            parent=current.GetParentControl()
+            if parent is None:
+                # we are at the root node
+                path_parts.append(f'{current.ControlTypeName}')
+                break
+            children=parent.GetChildren()
+            same_type_children=["-".join(map(lambda x:str(x),child.GetRuntimeId())) for child in children if child.ControlType==current.ControlType]
+            index=same_type_children.index("-".join(map(lambda x:str(x),current.GetRuntimeId())))
+            if same_type_children:
+                path_parts.append(f'{current.ControlTypeName}[{index+1}]')
+            else:
+                path_parts.append(f'{current.ControlTypeName}')
+            current=parent
+        path_parts.reverse()
+        xpath="/".join(path_parts)
+        return xpath
+
+    def get_element_from_xpath(self,xpath:str)->Control:
+        pattern = re.compile(r'(\w+)(?:\[(\d+)\])?')
+        parts=xpath.split("/")
+        root=GetRootControl()
+        element=root
+        for part in parts[1:]:
+            match=pattern.fullmatch(part)
+            if match is None:
+                continue
+            control_type, index=match.groups()
+            index=int(index) if index else None
+            children=element.GetChildren()
+            same_type_children=list(filter(lambda x:x.ControlTypeName==control_type,children))
+            if index:
+                element=same_type_children[index-1]
+            else:
+                element=same_type_children[0]
+        return element
     
     def get_windows_version(self)->str:
         response,status=self.execute_command("(Get-CimInstance Win32_OperatingSystem).Caption")

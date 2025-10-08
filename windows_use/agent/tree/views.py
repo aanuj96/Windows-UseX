@@ -69,6 +69,7 @@ class TreeElementNode:
     shortcut: str
     bounding_box: BoundingBox
     center: Center
+    xpath:str
     app_name: str
 
     def to_row(self, index: int):
@@ -88,6 +89,7 @@ class TextElementNode:
 class ScrollElementNode:
     name: str
     control_type: str
+    xpath:str
     app_name: str
     bounding_box: BoundingBox
     center: Center

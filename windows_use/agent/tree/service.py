@@ -23,22 +23,28 @@ class Tree:
         return TreeState(interactive_nodes=interactive_nodes,informative_nodes=informative_nodes,scrollable_nodes=scrollable_nodes)
 
     def get_appwise_nodes(self,node:Control) -> tuple[list[TreeElementNode],list[TextElementNode],list[ScrollElementNode]]:
-        apps:list[Control]=[]
+        apps:list[tuple[Control,int]]=[]
         found_foreground_app=False
-        # EXCLUDED_APPS.discard('Progman')
+
+        EXCLUDED_APPS.discard('Progman')
+        type_to_count={}
         for app in node.GetChildren():
+            control_type=app.ControlTypeName
+            # counting control types in the app
+            type_to_count[control_type]=type_to_count.get(control_type,0)+1
             if app.ClassName in EXCLUDED_APPS:
-                apps.append(app)
+                apps.append((app,type_to_count[control_type]))
             elif app.ClassName not in AVOIDED_APPS and self.desktop.is_app_visible(app):
                 if not found_foreground_app:
-                    apps.append(app)
+                    apps.append((app,type_to_count[control_type]))
                     found_foreground_app=True
-
+    
         interactive_nodes, informative_nodes, scrollable_nodes = [], [], []
 
         with ThreadPoolExecutor() as executor:
-            retry_counts = {app: 0 for app in apps}
-            future_to_app = {executor.submit(self.get_nodes, app, self.desktop.is_app_browser(app)): app for app in apps}
+            retry_counts = {app: 0 for app,_ in apps}
+            is_browser=self.desktop.is_app_browser(app)
+            future_to_app = {executor.submit(self.get_nodes, app, f"{node.ControlTypeName}/{app.ControlTypeName}[{index}]", is_browser): app for app,index in apps}
             while future_to_app:  # keep running until no pending futures
                 for future in as_completed(list(future_to_app)):
                     app = future_to_app.pop(future)  # remove completed future
@@ -59,7 +65,7 @@ class Tree:
                             print(f"Task failed completely for {app.Name} after {THREAD_MAX_RETRIES} retries")
         return interactive_nodes,informative_nodes,scrollable_nodes
 
-    def get_nodes(self, node: Control, is_browser=False) -> tuple[list[TreeElementNode],list[TextElementNode],list[ScrollElementNode]]:
+    def get_nodes(self, node: Control, current_xpath: str, is_browser=False) -> tuple[list[TreeElementNode],list[TextElementNode],list[ScrollElementNode]]:
         
         def is_element_visible(node:Control,threshold:int=0):
             is_control=node.IsControlElement
@@ -183,6 +189,7 @@ class Tree:
                             width=box.width(),
                             height=box.height()
                         ),
+                        xpath='',
                         center=center,
                         app_name=app_name
                     ))
@@ -208,11 +215,12 @@ class Tree:
                         width=box.width(),
                         height=box.height()
                     ),
+                    xpath='',
                     center=center,
                     app_name=app_name
                 ))
             
-        def tree_traversal(node: Control,is_dom=False,is_dialog=False):
+        def tree_traversal(node: Control, current_xpath:str,is_dom=False,is_dialog=False):
             # Checks to skip the nodes that are not interactive
             if node.IsOffscreen and (node.ControlTypeName not in set(["EditControl","TitleBarControl"])) and node.ClassName not in set(["Popup","Windows.UI.Core.CoreComponentInputSource"]):
                 return None
@@ -236,6 +244,7 @@ class Tree:
                         height=box.height()
                     ),
                     center=center,
+                    xpath=current_xpath,
                     horizontal_scrollable=scroll_pattern.HorizontallyScrollable,
                     horizontal_scroll_percent=scroll_pattern.HorizontalScrollPercent if scroll_pattern.HorizontallyScrollable else 0,
                     vertical_scrollable=scroll_pattern.VerticallyScrollable,
@@ -263,6 +272,7 @@ class Tree:
                             height=box.height()
                         ),
                         center=center,
+                        xpath=current_xpath,
                         app_name=app_name
                     )
                 if is_browser and is_dom:
@@ -276,12 +286,25 @@ class Tree:
                     app_name=app_name
                 ))
             
-            children=list(filter(lambda x: not is_browser and isinstance(x,WindowControl),node.GetChildren())) or node.GetChildren()
+            children=node.GetChildren()
+            type_to_count={}
+
             # Recursively check all children
             for child in children:
+                # Incrementally building the xpath
+                control_type=child.ControlTypeName
+                if len(children)>1:
+                    type_to_count[control_type]=type_to_count.get(control_type,0)+1
+                    child_index=type_to_count[control_type]
+                    child_xpath=f'{current_xpath}/{control_type}[{child_index}]'
+                else:
+                    child_xpath=f'{current_xpath}/{control_type}'
+                
+                # Check if the child is a DOM element
                 if is_browser and child.ClassName == "Chrome_RenderWidgetHostHWND":
                     # enter DOM subtree
-                    tree_traversal(child, is_dom=True, is_dialog=is_dialog)
+                    tree_traversal(child, current_xpath=child_xpath, is_dom=True, is_dialog=is_dialog)
+                # Check if the child is a dialog
                 elif isinstance(child,WindowControl):
                     if not is_keyboard_focusable(child):
                         if is_dom:
@@ -292,15 +315,15 @@ class Tree:
                         else:
                             interactive_nodes.clear()
                     # enter dialog subtree
-                    tree_traversal(child, is_dom=is_dom, is_dialog=True)
+                    tree_traversal(child, current_xpath=child_xpath, is_dom=is_dom, is_dialog=True)
                 else:
                     # normal non-dialog children
-                    tree_traversal(child, is_dom=is_dom, is_dialog=is_dialog)
+                    tree_traversal(child, current_xpath=child_xpath, is_dom=is_dom, is_dialog=is_dialog)
 
         interactive_nodes, dom_interactive_nodes, informative_nodes, scrollable_nodes = [], [], [],[]
         app_name=node.Name.strip()
         app_name='Desktop' if node.ClassName=='Progman' else app_name
-        tree_traversal(node,is_dom=False,is_dialog=False)
+        tree_traversal(node,current_xpath=current_xpath,is_dom=False,is_dialog=False)
         interactive_nodes.extend(dom_interactive_nodes)
         return (interactive_nodes,informative_nodes,scrollable_nodes)
     
@@ -362,6 +385,7 @@ class Tree:
         return padded_screenshot
     
     def get_annotated_image_data(self)->tuple[Image.Image,list[TreeElementNode],list[ScrollElementNode]]:
+        from uiautomation import GetRootControl
         node=GetRootControl()
         nodes,_,scroll_nodes=self.get_appwise_nodes(node=node)
         screenshot=self.annotated_screenshot(nodes=nodes,scale=1.0)
