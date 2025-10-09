@@ -41,6 +41,9 @@ class BoundingBox:
     width:int
     height:int
 
+    def get_center(self)->'Center':
+        return Center(x=self.left+self.width//2,y=self.top+self.height//2)
+
     def xywh_to_string(self):
         return f'({self.left},{self.top},{self.width},{self.height})'
     

@@ -1,6 +1,6 @@
 from windows_use.agent.tree.config import INTERACTIVE_CONTROL_TYPE_NAMES,INFORMATIVE_CONTROL_TYPE_NAMES, DEFAULT_ACTIONS, THREAD_MAX_RETRIES
 from windows_use.agent.tree.views import TreeElementNode, TextElementNode, ScrollElementNode, Center, BoundingBox, TreeState
-from uiautomation import Control,ImageControl,ScrollPattern,WindowControl
+from uiautomation import Control,ImageControl,ScrollPattern,WindowControl,Rect
 from windows_use.agent.tree.utils import random_point_within_bounding_box
 from windows_use.agent.desktop.config import AVOIDED_APPS, EXCLUDED_APPS
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -64,9 +64,39 @@ class Tree:
                         else:
                             print(f"Task failed completely for {app.Name} after {THREAD_MAX_RETRIES} retries")
         return interactive_nodes,informative_nodes,scrollable_nodes
+    
+    def iou_bounding_box(self,window_box: Rect, element_box: Rect) -> BoundingBox:
+        # Calculate intersection coordinates
+        intersection_left = max(window_box.left, element_box.left)
+        intersection_top = max(window_box.top, element_box.top)
+        intersection_right = min(window_box.right, element_box.right)
+        intersection_bottom = min(window_box.bottom, element_box.bottom)
+
+        if (intersection_right > intersection_left and intersection_bottom > intersection_top):
+            # Valid intersection
+            bounding_box = BoundingBox(
+                left=intersection_left,
+                top=intersection_top,
+                right=intersection_right,
+                bottom=intersection_bottom,
+                width=intersection_right - intersection_left,
+                height=intersection_bottom - intersection_top
+            )
+        else:
+            # No intersection
+            bounding_box = BoundingBox(
+                left=element_box.left,
+                top=element_box.top,
+                right=element_box.right,
+                bottom=element_box.bottom,
+                width=element_box.width(),
+                height=element_box.height()
+            )
+        return bounding_box
 
     def get_nodes(self, node: Control, current_xpath: str, is_browser=False) -> tuple[list[TreeElementNode],list[TextElementNode],list[ScrollElementNode]]:
-        
+        window_bounding_box=node.BoundingRectangle
+
         def is_element_visible(node:Control,threshold:int=0):
             is_control=node.IsControlElement
             box=node.BoundingRectangle
@@ -171,24 +201,17 @@ class Tree:
                         return None
                     if child.ControlTypeName!='TextControl':
                         return None
-                    box = node.BoundingRectangle
                     legacy_pattern=node.GetLegacyIAccessiblePattern()
                     value=legacy_pattern.Value
-                    x,y=box.xcenter(),box.ycenter()
-                    center = Center(x=x,y=y)
+                    element_bounding_box = node.BoundingRectangle
+                    bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
+                    center = bounding_box.get_center()
                     dom_interactive_nodes.append(TreeElementNode(
                         name=child.Name.strip(),
                         control_type=node.LocalizedControlType,
                         value=value,
                         shortcut=node.AcceleratorKey,
-                        bounding_box=BoundingBox(
-                            left=box.left,
-                            top=box.top,
-                            right=box.right,
-                            bottom=box.bottom,
-                            width=box.width(),
-                            height=box.height()
-                        ),
+                        bounding_box=bounding_box,
                         xpath='',
                         center=center,
                         app_name=app_name
@@ -197,24 +220,17 @@ class Tree:
                 dom_interactive_nodes.pop()
                 node=node.GetFirstChildControl()
                 control_type='link'
-                box = node.BoundingRectangle
                 legacy_pattern=node.GetLegacyIAccessiblePattern()
                 value=legacy_pattern.Value
-                x,y=box.xcenter(),box.ycenter()
-                center = Center(x=x,y=y)
+                element_bounding_box = node.BoundingRectangle
+                bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
+                center = bounding_box.get_center()
                 dom_interactive_nodes.append(TreeElementNode(
                     name=node.Name.strip(),
                     control_type=control_type,
                     value=node.Name.strip(),
                     shortcut=node.AcceleratorKey,
-                    bounding_box=BoundingBox(
-                        left=box.left,
-                        top=box.top,
-                        right=box.right,
-                        bottom=box.bottom,
-                        width=box.width(),
-                        height=box.height()
-                    ),
+                    bounding_box=bounding_box,
                     xpath='',
                     center=center,
                     app_name=app_name
@@ -255,22 +271,15 @@ class Tree:
                 legacy_pattern=node.GetLegacyIAccessiblePattern()
                 value=legacy_pattern.Value.strip() if legacy_pattern.Value is not None else ""
                 name=node.Name.strip()
-                box = node.BoundingRectangle
-                x,y=box.xcenter(),box.ycenter()
-                center = Center(x=x,y=y)
+                element_bounding_box = node.BoundingRectangle
+                bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
+                center = bounding_box.get_center()
                 tree_node=TreeElementNode(
                         name=name,
                         control_type=node.LocalizedControlType.title(),
                         value=value,
                         shortcut=node.AcceleratorKey,
-                        bounding_box=BoundingBox(
-                            left=box.left,
-                            top=box.top,
-                            right=box.right,
-                            bottom=box.bottom,
-                            width=box.width(),
-                            height=box.height()
-                        ),
+                        bounding_box=bounding_box,
                         center=center,
                         xpath=current_xpath,
                         app_name=app_name
@@ -293,7 +302,7 @@ class Tree:
             for child in children:
                 # Incrementally building the xpath
                 control_type=child.ControlTypeName
-                if len(children)>1:
+                if children:
                     type_to_count[control_type]=type_to_count.get(control_type,0)+1
                     child_index=type_to_count[control_type]
                     child_xpath=f'{current_xpath}/{control_type}[{child_index}]'
