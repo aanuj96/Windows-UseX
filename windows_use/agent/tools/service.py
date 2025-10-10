@@ -220,7 +220,7 @@ def type_tool(label:Optional[int]=None,loc:Optional[tuple[int,int]]=None,text:st
         return 'Error: Either label or coordinates must be provided.'
 
 @tool('Scroll Tool',args_schema=Scroll)
-def scroll_tool(loc:tuple[int,int]=None,type:Literal['horizontal','vertical']='vertical',direction:Literal['up','down','left','right']='down',wheel_times:int=1,**kwargs)->str:
+def scroll_tool(label:Optional[int]=None,loc:Optional[tuple[int,int]]=None,type:Literal['horizontal','vertical']='vertical',direction:Literal['up','down','left','right']='down',wheel_times:int=1,**kwargs)->str:
     '''
     Scrolls content vertically or horizontally at specified or current cursor location.
     
@@ -231,12 +231,21 @@ def scroll_tool(loc:tuple[int,int]=None,type:Literal['horizontal','vertical']='v
     
     Parameters:
         - wheel_times: Controls scroll distance (1 wheel ≈ 3-5 lines of text)
+        - direction: Scroll direction: 'up'/'down' for vertical, 'left'/'right' for horizontal
         - loc: Target coordinates (if None, scrolls at current cursor position)
+        - label: Label of scrollable element to scroll on (if None, scrolls at current cursor position)
     
     Essential tool for accessing content beyond the visible viewport.
     '''
     desktop:Desktop=kwargs['desktop']
-    response=desktop.scroll(loc,type,direction,wheel_times)
+    if loc:
+        response=desktop.scroll(loc,type,direction,wheel_times)
+    elif label:
+        loc=desktop.get_coordinates_from_label(label)
+        response=desktop.scroll(loc,type,direction,wheel_times)
+    else:
+        response=desktop.scroll(type=type,direction=direction,wheel_times=wheel_times)
+        
     if response:
         return response
     return f'Scrolled {type} {direction} by {wheel_times} wheel times.'
