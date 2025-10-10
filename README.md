@@ -131,8 +131,8 @@ python main.py
 ![Image](https://github.com/user-attachments/assets/e1d32725-e28a-4821-9c89-24b5ba2e583f)
 ![Image](https://github.com/user-attachments/assets/be72ad43-c320-4831-95cf-6f1f30df18de)
 ![Image](https://github.com/user-attachments/assets/d91b513e-13a0-4451-a6e9-f1e16def36e3)
-![Image](https://github.com/user-attachments/assets/b5ef5bcf-0e15-4c87-93fe-0f9a983536e5)
-![Image](https://github.com/user-attachments/assets/2b5cada6-4ca1-4e0c-8a10-2df29911b1cb)
+![Image](https://github.com/user-attachments/assets/7e832999-0fce-4d26-b884-cff17aa91073)
+![Image](https://github.com/user-attachments/assets/87a7d775-c51f-494c-be73-cfd7e8282f8e)
 
 ## Vision
 
