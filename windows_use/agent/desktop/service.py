@@ -1,6 +1,7 @@
 from uiautomation import Control, GetRootControl, IsIconic, IsZoomed, IsWindowVisible, ControlType, ControlFromCursor, IsTopLevelWindow, ShowWindow, ControlFromHandle
 from windows_use.agent.desktop.config import EXCLUDED_APPS, AVOIDED_APPS, BROWSER_NAMES, PROCESS_PER_MONITOR_DPI_AWARE
 from windows_use.agent.desktop.views import DesktopState, App, Size, Status
+from windows_use.agent.tree.views import TreeElementNode
 from windows_use.agent.tree.service import Tree
 from PIL.Image import Image as PILImage
 from locale import getpreferredencoding
@@ -195,6 +196,18 @@ class Desktop:
             app=Application().connect(handle=app.handle)
             app.window().set_focus()
             return (f'Switched to {app_name.title()} window.',0)
+    
+    def get_element_handle_from_label(self,label:int)->Control:
+        tree_state=self.desktop_state.tree_state
+        element_node=tree_state.interactive_nodes[label]
+        xpath=element_node.xpath
+        element_handle=self.get_element_from_xpath(xpath)
+        return element_handle
+    
+    def get_coordinates_from_label(self,label:int)->tuple[int,int]:
+        element_handle=self.get_element_handle_from_label(label)
+        bounding_rectangle=element_handle.BoundingRectangle
+        return bounding_rectangle.xcenter(),bounding_rectangle.ycenter()
         
     def click(self,loc:tuple[int,int],button:str='left',clicks:int=2):
         x,y=loc

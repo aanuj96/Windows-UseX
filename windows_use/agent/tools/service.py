@@ -162,9 +162,9 @@ def shell_tool(command: str,**kwargs) -> str:
     return f'Response: {response}\nStatus Code: {status}'
 
 @tool('Click Tool',args_schema=Click)
-def click_tool(loc:tuple[int,int],button:Literal['left','right','middle']='left',clicks:int=1,**kwargs)->str:
+def click_tool(label:Optional[int]=None,loc:Optional[tuple[int,int]]=None,button:Literal['left','right','middle']='left',clicks:int=1,**kwargs)->str:
     '''
-    Performs mouse click operations on UI elements at specified coordinates.
+    Performs mouse click operations on UI elements at specified label/coordinates.
     
     Click patterns:
         - Single left click: Select elements, focus input fields
@@ -174,15 +174,25 @@ def click_tool(loc:tuple[int,int],button:Literal['left','right','middle']='left'
     
     Automatically detects UI elements under cursor and adjusts click behavior 
     for reliable interaction. Essential for all point-and-click UI operations.
+
+    Note: Accessing the element can be either by label or coordinates.
     '''
-    x,y=loc
     desktop:Desktop=kwargs['desktop']
-    desktop.click(loc,button,clicks)
     num_clicks={1:'Single',2:'Double',3:'Triple'}
-    return f'{num_clicks.get(clicks)} {button} at ({x},{y}).'
+    if loc:
+        x,y=loc
+        desktop.click(loc,button,clicks)
+        return f'{num_clicks.get(clicks)} {button} at ({x},{y}).'
+    elif label:
+        
+        loc=desktop.get_coordinates_from_label(label)
+        desktop.click(loc,button,clicks)
+        return f'{num_clicks.get(clicks)} {button} on label {label}.'
+    else:
+        return 'Error: Either label or coordinates must be provided.'
 
 @tool('Type Tool',args_schema=Type)
-def type_tool(loc:tuple[int,int],text:str,clear:Literal['true','false']='false',caret_position:Literal['start','idle','end']='idle',press_enter:Literal['true','false']='false',**kwargs):
+def type_tool(label:Optional[int]=None,loc:Optional[tuple[int,int]]=None,text:str='',clear:Literal['true','false']='false',caret_position:Literal['start','idle','end']='idle',press_enter:Literal['true','false']='false',**kwargs):
     '''
     Types text into input fields, text areas, and focused UI elements.
     
@@ -193,12 +203,21 @@ def type_tool(loc:tuple[int,int],text:str,clear:Literal['true','false']='false',
         - Optionally press Enter after typing
     
     Use for form filling, search queries, text editing, and any text input operation.
-    Always click on the target element coordinates first to ensure proper focus.
+    Always click on the target element label/coordinates first to ensure proper focus.
+
+    Note: Accessing the element can be either by label or coordinates.
     '''
-    x,y=loc
     desktop:Desktop=kwargs['desktop']
-    desktop.type(loc,text,clear,caret_position,press_enter)
-    return f'Typed {text} at ({x},{y}).'
+    if loc:
+        x,y=loc
+        desktop.type(loc,text,clear,caret_position,press_enter)
+        return f'Typed {text} at ({x},{y}).'
+    elif label:
+        loc=desktop.get_coordinates_from_label(label)
+        desktop.type(loc,text,clear,caret_position,press_enter)
+        return f'Typed {text} on label {label}.'
+    else:
+        return 'Error: Either label or coordinates must be provided.'
 
 @tool('Scroll Tool',args_schema=Scroll)
 def scroll_tool(loc:tuple[int,int]=None,type:Literal['horizontal','vertical']='vertical',direction:Literal['up','down','left','right']='down',wheel_times:int=1,**kwargs)->str:

@@ -68,10 +68,15 @@ class Memory(SharedBaseModel):
     )
 
 class Click(SharedBaseModel):
-    loc: tuple[int, int] = Field(
-        ...,
+    label: Optional[int] = Field(
+        description="Label of element to click (0-indexed)",
+        default=None,
+        examples=[0, 1,None]
+    )
+    loc: Optional[tuple[int, int]] = Field(
         description="(x, y) pixel coordinates within the target element's bounding box to perform click action",
-        examples=[(640, 360), (100, 200)]
+        default=None,
+        examples=[(640, 360), (100, 200),None]
     )
     button: Literal['left', 'right', 'middle'] = Field(
         description="Mouse button to use: 'left' for selection/activation, 'right' for context menus, 'middle' for browser-specific actions",
@@ -97,10 +102,15 @@ class Shell(SharedBaseModel):
     )
 
 class Type(SharedBaseModel):
-    loc: tuple[int, int] = Field(
-        ...,
+    label: int|None = Field(
+        description="Label of element to click (0-indexed)",
+        default=None,
+        examples=[0, 1,None]
+    )
+    loc: tuple[int, int]|None = Field(
         description="(x, y) pixel coordinates within the target input element's bounding box where text will be entered",
-        examples=[(640, 360), (200, 150)]
+        default=None,
+        examples=[(640, 360), (200, 150),None]
     )
     text: str = Field(
         ...,
@@ -138,6 +148,11 @@ class MultiEdit(SharedBaseModel):
     )
 
 class Scroll(SharedBaseModel):
+    label: int|None = Field(
+        description="Label of element to scroll (0-indexed)",
+        default=None,
+        examples=[0, 1]
+    )
     loc: tuple[int, int] | None = Field(
         description="(x, y) pixel coordinates where scroll action occurs. If None, scrolls at current cursor position",
         default=None,

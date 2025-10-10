@@ -115,3 +115,5 @@ class ScrollElementNode:
             self.vertical_scroll_percent,
             self.is_focused
         ]
+
+ElementNode=TreeElementNode|TextElementNode|ScrollElementNode
