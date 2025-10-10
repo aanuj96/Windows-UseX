@@ -48,6 +48,44 @@ pip install windows-use
 
 ## ⚙️Basic Usage
 
+### Google Gemini
+
+```python
+from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
+from windows_use.agent import Agent, Browser
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+def main():
+    llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash', temperature=0.2)
+    agent = Agent(llm=llm, browser=Browser.EDGE, use_vision=False, auto_minimize=True)
+    agent.print_response(query=input("Enter a query: "))
+
+if __name__ == "__main__":
+    main()
+```
+
+### Cerebras
+
+```python
+from langchain_cerebras.chat_models import ChatCerebras
+from windows_use.agent import Agent, Browser
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+def main():
+    llm=ChatCerebras(api_key=os.getenv("CEREBRAS_API_KEY"), model="gpt-oss-120b", temperature=0.2)
+    agent = Agent(llm=llm, browser=Browser.EDGE, use_vision=False, auto_minimize=True)
+    agent.print_response(query=input("Enter a query: "))
+
+if __name__ == "__main__":
+    main()
+```
+
 ### OpenRouter
 
 ```python
@@ -61,25 +99,6 @@ load_dotenv()
 def main():
     api_key=os.getenv("OPENROUTER_API_KEY")
     llm = ChatOpenRouter(model="openai/gpt-4o",api_key=api_key)
-    agent = Agent(llm=llm, browser=Browser.EDGE, use_vision=False, auto_minimize=True)
-    agent.print_response(query=input("Enter a query: "))
-
-if __name__ == "__main__":
-    main()
-```
-
-### Google Gemini 
-
-```python
-from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from windows_use.agent import Agent, Browser
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-def main():
-    llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash', temperature=0.2)
     agent = Agent(llm=llm, browser=Browser.EDGE, use_vision=False, auto_minimize=True)
     agent.print_response(query=input("Enter a query: "))
 

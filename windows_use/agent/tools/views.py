@@ -7,23 +7,23 @@ class SharedBaseModel(BaseModel):
 
 class App(SharedBaseModel):
     mode: Literal['launch', 'resize', 'switch'] = Field(
-        ...,
         description="Operation mode: 'launch' opens app from Start Menu, 'resize' adjusts active window size/position, 'switch' brings specific window into focus",
-        examples=['launch']
+        default='launch',
+        examples=['launch', 'resize']
     )
-    name: Optional[str] = Field(
+    name: str|None = Field(
         description="Exact application name as it appears in Start Menu or window title (required for launch/switch modes)",
-        examples=['notepad', 'chrome', 'New tab - Personal - Microsoft Edge'],
+        examples=['notepad', 'chrome', 'New tab - Personal - Microsoft Edge',None],
         default=None
     )
-    loc: Optional[tuple[int, int]] = Field(
+    loc: tuple[int, int]|None = Field(
         description="Target (x, y) coordinates for window top-left corner position (required for resize mode)",
-        examples=[(0, 0)],
+        examples=[(0, 0),None],
         default=None
     )
-    size: Optional[tuple[int, int]] = Field(
+    size: tuple[int, int]|None = Field(
         description="Target (width, height) dimensions in pixels for window size (required for resize mode)",
-        examples=[(1920, 1080)],
+        examples=[(1920, 1080),None],
         default=None
     )
 
@@ -68,12 +68,12 @@ class Memory(SharedBaseModel):
     )
 
 class Click(SharedBaseModel):
-    label: Optional[int] = Field(
+    label: int|None = Field(
         description="Label of element to click (0-indexed)",
         default=None,
         examples=[0, 1,None]
     )
-    loc: Optional[tuple[int, int]] = Field(
+    loc: tuple[int, int]|None = Field(
         description="(x, y) pixel coordinates within the target element's bounding box to perform click action",
         default=None,
         examples=[(640, 360), (100, 200),None]
