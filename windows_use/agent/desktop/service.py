@@ -35,15 +35,15 @@ pg.PAUSE=1.0
 class Desktop:
     def __init__(self):
         self.encoding=getpreferredencoding()
+        self.tree=Tree(self)
         self.desktop_state=None
         
     def get_state(self,use_vision:bool=False)->DesktopState:
-        tree=Tree(self)
         active_app,apps=self.get_apps()
         root=GetRootControl()
-        tree_state=tree.get_state(root=root)
+        tree_state=self.tree.get_state(root=root)
         if use_vision:
-            annotated_screenshot=tree.annotated_screenshot(tree_state.interactive_nodes,scale=0.5)
+            annotated_screenshot=self.tree.annotated_screenshot(tree_state.interactive_nodes,scale=0.5)
             screenshot=self.screenshot_in_bytes(annotated_screenshot)
         else:
             screenshot=None
