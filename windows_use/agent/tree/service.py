@@ -15,7 +15,12 @@ if TYPE_CHECKING:
 class Tree:
     def __init__(self,desktop:'Desktop'):
         self.desktop=desktop
-        self.screen_size=self.desktop.get_screen_resolution()
+        screen_size=self.desktop.get_screen_resolution()
+        self.dom_bounding_box:BoundingBox=None
+        self.screen_box=BoundingBox(
+            top=0, left=0, bottom=screen_size.height, right=screen_size.width,
+            width=screen_size.width, height=screen_size.height 
+        )
 
     def get_state(self,root:Control)->TreeState:
         sleep(0.1)
@@ -65,15 +70,21 @@ class Tree:
                             print(f"Task failed completely for {app.Name} after {THREAD_MAX_RETRIES} retries")
         return interactive_nodes,informative_nodes,scrollable_nodes
     
-    def iou_bounding_box(self,window_box: Rect, element_box: Rect) -> BoundingBox:
-        # Calculate intersection coordinates
+    def iou_bounding_box(self,window_box: Rect,element_box: Rect,) -> BoundingBox:
+        # Step 1: Intersection of element and window (existing logic)
         intersection_left = max(window_box.left, element_box.left)
         intersection_top = max(window_box.top, element_box.top)
         intersection_right = min(window_box.right, element_box.right)
         intersection_bottom = min(window_box.bottom, element_box.bottom)
 
+        # Step 2: Clamp to screen boundaries (new addition)
+        intersection_left = max(self.screen_box.left, intersection_left)
+        intersection_top = max(self.screen_box.top, intersection_top)
+        intersection_right = min(self.screen_box.right, intersection_right)
+        intersection_bottom = min(self.screen_box.bottom, intersection_bottom)
+
+        # Step 3: Validate intersection
         if (intersection_right > intersection_left and intersection_bottom > intersection_top):
-            # Valid intersection
             bounding_box = BoundingBox(
                 left=intersection_left,
                 top=intersection_top,
@@ -83,16 +94,17 @@ class Tree:
                 height=intersection_bottom - intersection_top
             )
         else:
-            # No intersection
+            # No valid visible intersection (either outside window or screen)
             bounding_box = BoundingBox(
-                left=element_box.left,
-                top=element_box.top,
-                right=element_box.right,
-                bottom=element_box.bottom,
-                width=element_box.width(),
-                height=element_box.height()
+                left=0,
+                top=0,
+                right=0,
+                bottom=0,
+                width=0,
+                height=0
             )
         return bounding_box
+
 
     def get_nodes(self, node: Control, current_xpath: str, is_browser=False) -> tuple[list[TreeElementNode],list[TextElementNode],list[ScrollElementNode]]:
         window_bounding_box=node.BoundingRectangle
@@ -204,7 +216,7 @@ class Tree:
                     legacy_pattern=node.GetLegacyIAccessiblePattern()
                     value=legacy_pattern.Value
                     element_bounding_box = node.BoundingRectangle
-                    bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
+                    bounding_box=self.iou_bounding_box(self.dom_bounding_box,element_bounding_box)
                     center = bounding_box.get_center()
                     dom_interactive_nodes.append(TreeElementNode(
                         name=child.Name.strip(),
@@ -223,7 +235,7 @@ class Tree:
                 legacy_pattern=node.GetLegacyIAccessiblePattern()
                 value=legacy_pattern.Value
                 element_bounding_box = node.BoundingRectangle
-                bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
+                bounding_box=self.iou_bounding_box(self.dom_bounding_box,element_bounding_box)
                 center = bounding_box.get_center()
                 dom_interactive_nodes.append(TreeElementNode(
                     name=node.Name.strip(),
@@ -272,22 +284,34 @@ class Tree:
                 value=legacy_pattern.Value.strip() if legacy_pattern.Value is not None else ""
                 name=node.Name.strip()
                 element_bounding_box = node.BoundingRectangle
-                bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
-                center = bounding_box.get_center()
-                tree_node=TreeElementNode(
-                        name=name,
-                        control_type=node.LocalizedControlType.title(),
-                        value=value,
-                        shortcut=node.AcceleratorKey,
-                        bounding_box=bounding_box,
-                        center=center,
-                        xpath=current_xpath,
-                        app_name=app_name
-                    )
                 if is_browser and is_dom:
+                    bounding_box=self.iou_bounding_box(self.dom_bounding_box,element_bounding_box)
+                    center = bounding_box.get_center()
+                    tree_node=TreeElementNode(
+                            name=name,
+                            control_type=node.LocalizedControlType.title(),
+                            value=value,
+                            shortcut=node.AcceleratorKey,
+                            bounding_box=bounding_box,
+                            center=center,
+                            xpath=current_xpath,
+                            app_name=app_name
+                        )
                     dom_interactive_nodes.append(tree_node)
                     dom_correction(node=node)
                 else:
+                    bounding_box=self.iou_bounding_box(window_bounding_box,element_bounding_box)
+                    center = bounding_box.get_center()
+                    tree_node=TreeElementNode(
+                            name=name,
+                            control_type=node.LocalizedControlType.title(),
+                            value=value,
+                            shortcut=node.AcceleratorKey,
+                            bounding_box=bounding_box,
+                            center=center,
+                            xpath=current_xpath,
+                            app_name=app_name
+                        )
                     interactive_nodes.append(tree_node)
             elif is_element_text(node):
                 informative_nodes.append(TextElementNode(
@@ -311,6 +335,10 @@ class Tree:
                 
                 # Check if the child is a DOM element
                 if is_browser and child.ClassName == "Chrome_RenderWidgetHostHWND":
+                    bounding_box=child.BoundingRectangle
+                    self.dom_bounding_box=BoundingBox(left=bounding_box.left,top=bounding_box.top,
+                    right=bounding_box.right,bottom=bounding_box.bottom,width=bounding_box.width(),
+                    height=bounding_box.height())
                     # enter DOM subtree
                     tree_traversal(child, current_xpath=child_xpath, is_dom=True, is_dialog=is_dialog)
                 # Check if the child is a dialog
@@ -318,7 +346,7 @@ class Tree:
                     if not is_keyboard_focusable(child):
                         if is_dom:
                             bounding_box=child.BoundingRectangle
-                            if bounding_box.width() > 0.6*self.screen_size.width:
+                            if bounding_box.width() > 0.6*self.screen_box.width:
                                 # Because this window element covers the majority of the screen
                                 dom_interactive_nodes.clear()
                         else:
