@@ -134,17 +134,17 @@ class Type(SharedBaseModel):
     )
 
 class MultiSelect(SharedBaseModel):
-    elements: list[tuple[int, int]] = Field(
+    elements: list[tuple[int, int]|int] = Field(
         ...,
-        description="List of (x, y) pixel coordinates within the target element's bounding box for multiple selection",
-        examples=[[(640, 360), (800, 400)], [(100, 200), (200, 300)]]
+        description="List of (x, y) pixel coordinates or label of the target elements for multiple selection",
+        examples=[[(640, 360), (800, 400)], [5, 3]]
     )
 
 class MultiEdit(SharedBaseModel):
-    elements: list[tuple[int, int, str]] = Field(
+    elements: list[tuple[int, int, str]|tuple[int,str]] = Field(
         ...,
-        description="List of (x, y, text) pixel coordinates within the target element's bounding box for multiple editing",
-        examples=[[(640, 360, 'hello'), (800, 400, 'world')], [(100, 200, 'foo'), (200, 300, 'bar')]]
+        description="List of (x, y, text) pixel coordinates or (a, text) label of the target elements for multiple editing",
+        examples=[[(640, 360, 'hello'), (800, 400, 'world')], [(2, 'foo'), (5, 'bar')]]
     )
 
 class Scroll(SharedBaseModel):

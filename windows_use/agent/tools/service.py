@@ -306,7 +306,7 @@ def shortcut_tool(shortcut:str,**kwargs)->str:
     return f'Pressed {shortcut}.'
 
 @tool('Multi Select Tool',args_schema=MultiSelect)
-def multi_select_tool(elements:list[tuple[int,int]],**kwargs)->str:
+def multi_select_tool(elements:list[tuple[int,int]|int],**kwargs)->str:
     '''
     Holding down the Ctrl key and clicking on multiple elements.
     
@@ -319,10 +319,17 @@ def multi_select_tool(elements:list[tuple[int,int]],**kwargs)->str:
     '''
     desktop:Desktop=kwargs['desktop']
     desktop.multi_select(elements)
-    return f'Multi-selected elements at {'\n'.join([f'({x},{y})' for x,y in elements])}.'
+    content=[]
+    for element in elements:
+        if isinstance(element,tuple):
+            x,y=element
+            content.append(f'({x},{y})')
+        else:
+            content.append(f'{element}')
+    return f'Multi-selected elements at {','.join(content)}.'
 
 @tool('Multi Edit Tool',args_schema=MultiEdit)
-def multi_edit_tool(elements:list[tuple[int,int,str]],**kwargs)->str:
+def multi_edit_tool(elements:list[tuple[int,int,str]|tuple[int,str]],**kwargs)->str:
     '''
     Typing text into multiple input fields.
     
@@ -335,7 +342,15 @@ def multi_edit_tool(elements:list[tuple[int,int,str]],**kwargs)->str:
     '''
     desktop:Desktop=kwargs['desktop']
     desktop.multi_edit(elements)
-    return f'Multi-edited elements at {','.join([f'({x},{y}) text={text}' for x,y,text in elements])}.'
+    content=[]
+    for element in elements:
+        if len(element)==3:
+            x,y,text=element
+            content.append(f'({x},{y}) text={text}')
+        elif len(element)==2:
+            label,text=element
+            content.append(f'({label}) text={text}')
+    return f'Multi-edited elements at {','.join(content)}.'
 
 @tool('Wait Tool',args_schema=Wait)
 def wait_tool(duration:int,**kwargs)->str:
