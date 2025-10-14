@@ -158,6 +158,8 @@ Windows-Use makes use of several excellent open-source projects that power its W
 
 - [PyAutoGUI](https://github.com/asweigart/pyautogui)
 
+Huge thanks to the maintainers and contributors of these libraries for their outstanding work and open-source spirit.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please check the [CONTRIBUTING](CONTRIBUTING) file for setup and development workflow.
