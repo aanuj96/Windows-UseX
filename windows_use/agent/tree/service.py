@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Tree:
     def __init__(self,desktop:'Desktop'):
         self.desktop=desktop
-        screen_size=self.desktop.get_screen_resolution()
+        screen_size=self.desktop.get_screen_size()
         self.dom_bounding_box:BoundingBox=None
         self.screen_box=BoundingBox(
             top=0, left=0, bottom=screen_size.height, right=screen_size.width,

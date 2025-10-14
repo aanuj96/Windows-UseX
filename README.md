@@ -150,6 +150,14 @@ Agent interacts directly with your Windows OS at GUI layer to perform actions. W
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 🙏 Acknowledgements
+
+Windows-Use makes use of several excellent open-source projects that power its Windows automation features:
+
+- [UIAutomation](https://github.com/yinkaisheng/Python-UIAutomation-for-Windows)
+
+- [PyAutoGUI](https://github.com/asweigart/pyautogui)
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please check the [CONTRIBUTING](CONTRIBUTING) file for setup and development workflow.

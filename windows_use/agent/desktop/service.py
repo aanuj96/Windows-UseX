@@ -1,4 +1,3 @@
-from uiautomation import Control, GetRootControl, IsIconic, IsZoomed, IsWindowVisible, ControlType, ControlFromCursor, IsTopLevelWindow, ShowWindow, ControlFromHandle, GetForegroundWindow, SetForegroundWindow
 from windows_use.agent.desktop.config import EXCLUDED_APPS, AVOIDED_APPS, BROWSER_NAMES, PROCESS_PER_MONITOR_DPI_AWARE
 from windows_use.agent.desktop.views import DesktopState, App, Size, Status
 from windows_use.agent.tree.service import Tree
@@ -40,7 +39,7 @@ class Desktop:
         
     def get_state(self,use_vision:bool=False)->DesktopState:
         active_app,apps=self.get_apps()
-        root=GetRootControl()
+        root=uia.GetRootControl()
         tree_state=self.tree.get_state(root=root)
         if use_vision:
             annotated_screenshot=self.tree.annotated_screenshot(tree_state.interactive_nodes,scale=0.5)
@@ -50,16 +49,16 @@ class Desktop:
         self.desktop_state=DesktopState(apps= apps,active_app=active_app,screenshot=screenshot,tree_state=tree_state)
         return self.desktop_state
     
-    def get_window_element_from_element(self,element:Control)->Control|None:
+    def get_window_element_from_element(self,element:uia.Control)->uia.Control|None:
         while element is not None:
-            if IsTopLevelWindow(element.NativeWindowHandle):
+            if uia.IsTopLevelWindow(element.NativeWindowHandle):
                 return element
             element = element.GetParentControl()
         return None
     
     def get_active_app(self,apps:list[App])->App|None:
         try:
-            handle=GetForegroundWindow()
+            handle=uia.GetForegroundWindow()
             for app in apps:
                 if app.handle!=handle:
                     continue
@@ -68,12 +67,12 @@ class Desktop:
             print(f"Error: {ex}")
         return None
     
-    def get_app_status(self,control:Control)->Status:
-        if IsIconic(control.NativeWindowHandle):
+    def get_app_status(self,control:uia.Control)->Status:
+        if uia.IsIconic(control.NativeWindowHandle):
             return Status.MINIMIZED
-        elif IsZoomed(control.NativeWindowHandle):
+        elif uia.IsZoomed(control.NativeWindowHandle):
             return Status.MAXIMIZED
-        elif IsWindowVisible(control.NativeWindowHandle):
+        elif uia.IsWindowVisible(control.NativeWindowHandle):
             return Status.NORMAL
         else:
             return Status.HIDDEN
@@ -82,8 +81,8 @@ class Desktop:
         position=pg.position()
         return (position.x,position.y)
     
-    def get_element_under_cursor(self)->Control:
-        return ControlFromCursor()
+    def get_element_under_cursor(self)->uia.Control:
+        return uia.ControlFromCursor()
     
     def get_apps_from_start_menu(self)->dict[str,str]:
         command='Get-StartApps | ConvertTo-Csv -NoTypeInformation'
@@ -108,7 +107,7 @@ class Desktop:
         except Exception as e:
             return ('Command execution failed', 1)
         
-    def is_app_browser(self,node:Control):
+    def is_app_browser(self,node:uia.Control):
         process=Process(node.ProcessId)
         return process.name() in BROWSER_NAMES
     
@@ -127,7 +126,7 @@ class Desktop:
         elif active_app.status==Status.MAXIMIZED:
             return f"{active_app.name} is maximized",1
         else:
-            app_control=ControlFromHandle(active_app.handle)
+            app_control=uia.ControlFromHandle(active_app.handle)
             if loc is None:
                 x=app_control.BoundingRectangle.left
                 y=app_control.BoundingRectangle.top
@@ -193,14 +192,14 @@ class Desktop:
             return (f'Application {name.title()} not found.',1)
         app_name,_=matched_app
         app=apps.get(app_name)
-        if IsIconic(app.handle):
-            ShowWindow(app.handle, cmdShow=9)
+        if uia.IsIconic(app.handle):
+            uia.ShowWindow(app.handle, cmdShow=9)
             return (f'{app_name.title()} restored from Minimized state.',0)
         else:
-            SetForegroundWindow(app.handle)
+            uia.SetForegroundWindow(app.handle)
             return (f'Switched to {app_name.title()} window.',0)
     
-    def get_element_handle_from_label(self,label:int)->Control:
+    def get_element_handle_from_label(self,label:int)->uia.Control:
         tree_state=self.desktop_state.tree_state
         element_node=tree_state.interactive_nodes[label]
         xpath=element_node.xpath
@@ -310,7 +309,7 @@ class Desktop:
         content=markdownify(html=html)
         return content
     
-    def get_app_size(self,control:Control):
+    def get_app_size(self,control:uia.Control):
         window=control.BoundingRectangle
         if window.isempty():
             return Size(width=0,height=0)
@@ -323,7 +322,7 @@ class Desktop:
         is_overlay=self.is_overlay_app(app)
         return not is_overlay and is_minimized and area>10
     
-    def is_overlay_app(self,element:Control) -> bool:
+    def is_overlay_app(self,element:uia.Control) -> bool:
         no_children = len(element.GetChildren()) == 0
         is_name = "Overlay" in element.Name.strip()
         return no_children or is_name
@@ -331,13 +330,13 @@ class Desktop:
     def get_apps(self) -> tuple[App|None,list[App]]:
         try:
             sleep(0.5)
-            desktop = GetRootControl()  # Get the desktop control
+            desktop = uia.GetRootControl()  # Get the desktop control
             elements = desktop.GetChildren()
             apps = []
             for depth, element in enumerate(elements):
                 if (element.ClassName in EXCLUDED_APPS) or (element.ClassName in AVOIDED_APPS) or self.is_overlay_app(element):
                     continue
-                if element.ControlType in [ControlType.WindowControl, ControlType.PaneControl]:
+                if element.ControlType in [uia.ControlType.WindowControl, uia.ControlType.PaneControl]:
                     status = self.get_app_status(element)
                     size=self.get_app_size(element)
                     apps.append(App(name=element.Name, depth=depth, status=status,size=size,handle=element.NativeWindowHandle))
@@ -350,7 +349,7 @@ class Desktop:
             apps.remove(active_app)
         return (active_app,apps)
     
-    def get_xpath_from_element(self,element:Control):
+    def get_xpath_from_element(self,element:uia.Control):
         current=element
         if current is None:
             return ""
@@ -373,10 +372,10 @@ class Desktop:
         xpath="/".join(path_parts)
         return xpath
 
-    def get_element_from_xpath(self,xpath:str)->Control:
+    def get_element_from_xpath(self,xpath:str)->uia.Control:
         pattern = re.compile(r'(\w+)(?:\[(\d+)\])?')
         parts=xpath.split("/")
-        root=GetRootControl()
+        root=uia.GetRootControl()
         element=root
         for part in parts[1:]:
             match=pattern.fullmatch(part)
@@ -407,10 +406,8 @@ class Desktop:
         dpi = user32.GetDpiForSystem()
         return dpi / 96.0
     
-    def get_screen_resolution(self)->Size:
-        user32 = ctypes.windll.user32
-        width = user32.GetSystemMetrics(0)
-        height = user32.GetSystemMetrics(1)
+    def get_screen_size(self)->Size:
+        width, height = uia.GetScreenSize()
         return Size(width=width,height=height)
     
     def screenshot_in_bytes(self,screenshot:PILImage)->bytes:
@@ -431,9 +428,8 @@ class Desktop:
         SW_MINIMIZE=6
         SW_RESTORE = 9
         try:
-            user32 = ctypes.windll.user32
-            hWnd = user32.GetForegroundWindow()
-            user32.ShowWindow(hWnd, SW_MINIMIZE)
+            handle = uia.GetForegroundWindow()
+            uia.ShowWindow(handle, SW_MINIMIZE)
             yield
         finally:
-            user32.ShowWindow(hWnd, SW_RESTORE)
+            uia.ShowWindow(handle, SW_RESTORE)
