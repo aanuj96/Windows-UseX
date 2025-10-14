@@ -1,5 +1,5 @@
 from windows_use.agent.tools.service import (click_tool, type_tool, shell_tool, done_tool, multi_select_tool,
-shortcut_tool, scroll_tool, drag_tool, move_tool, wait_tool, app_tool, scrape_tool, multi_edit_tool, memory_tool)
+shortcut_tool, scroll_tool, drag_tool, move_tool, wait_tool, app_tool, scrape_tool, multi_edit_tool)
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from windows_use.agent.utils import extract_agent_data, image_message
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -12,7 +12,6 @@ from live_inspect.watch_cursor import WatchCursor
 from langgraph.graph import START,END,StateGraph
 from windows_use.agent.views import AgentResult
 from windows_use.agent.state import AgentState
-from langchain_core.tools import BaseTool
 from contextlib import nullcontext
 from rich.markdown import Markdown
 from rich.console import Console
@@ -46,14 +45,14 @@ class Agent:
     Returns:
         Agent
     '''
-    def __init__(self,instructions:list[str]=[],additional_tools:list[BaseTool]=[],browser:Browser=Browser.EDGE, llm: BaseChatModel=None,max_consecutive_failures:int=3,max_steps:int=25,use_vision:bool=False,auto_minimize:bool=False):
+    def __init__(self,instructions:list[str]=[],browser:Browser=Browser.EDGE, llm: BaseChatModel=None,max_consecutive_failures:int=3,max_steps:int=25,use_vision:bool=False,auto_minimize:bool=False):
         self.name='Windows Use'
-        self.description='An agent that can interact with GUI elements on Windows' 
+        self.description='An agent that can interact with GUI elements on Windows OS' 
         self.registry = Registry([
             click_tool,type_tool, app_tool, shell_tool, done_tool, 
             shortcut_tool, scroll_tool, drag_tool, move_tool,
             wait_tool, scrape_tool, multi_select_tool, multi_edit_tool
-        ] + additional_tools)
+        ])
         self.instructions=instructions
         self.browser=browser
         self.max_steps=max_steps
