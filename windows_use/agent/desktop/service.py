@@ -1,4 +1,4 @@
-from uiautomation import Control, GetRootControl, IsIconic, IsZoomed, IsWindowVisible, ControlType, ControlFromCursor, IsTopLevelWindow, ShowWindow, ControlFromHandle
+from uiautomation import Control, GetRootControl, IsIconic, IsZoomed, IsWindowVisible, ControlType, ControlFromCursor, IsTopLevelWindow, ShowWindow, ControlFromHandle, GetForegroundWindow, SetForegroundWindow
 from windows_use.agent.desktop.config import EXCLUDED_APPS, AVOIDED_APPS, BROWSER_NAMES, PROCESS_PER_MONITOR_DPI_AWARE
 from windows_use.agent.desktop.views import DesktopState, App, Size, Status
 from windows_use.agent.tree.service import Tree
@@ -58,8 +58,14 @@ class Desktop:
         return None
     
     def get_active_app(self,apps:list[App])->App|None:
-        if len(apps)>0 and apps[0].status != Status.MINIMIZED:
-            return apps[0]
+        try:
+            handle=GetForegroundWindow()
+            for app in apps:
+                if app.handle!=handle:
+                    continue
+                return app
+        except Exception as ex:
+            print(f"Error: {ex}")
         return None
     
     def get_app_status(self,control:Control)->Status:
@@ -191,9 +197,7 @@ class Desktop:
             ShowWindow(app.handle, cmdShow=9)
             return (f'{app_name.title()} restored from Minimized state.',0)
         else:
-            from pywinauto import Application
-            app=Application().connect(handle=app.handle)
-            app.window().set_focus()
+            SetForegroundWindow(app.handle)
             return (f'Switched to {app_name.title()} window.',0)
     
     def get_element_handle_from_label(self,label:int)->Control:
@@ -331,7 +335,7 @@ class Desktop:
             elements = desktop.GetChildren()
             apps = []
             for depth, element in enumerate(elements):
-                if element.ClassName in EXCLUDED_APPS or element.ClassName in AVOIDED_APPS or self.is_overlay_app(element):
+                if (element.ClassName in EXCLUDED_APPS) or (element.ClassName in AVOIDED_APPS) or self.is_overlay_app(element):
                     continue
                 if element.ControlType in [ControlType.WindowControl, ControlType.PaneControl]:
                     status = self.get_app_status(element)
@@ -342,7 +346,8 @@ class Desktop:
             apps = []
 
         active_app=self.get_active_app(apps)
-        apps=apps[1:] if len(apps)>1 else []
+        if active_app:
+            apps.remove(active_app)
         return (active_app,apps)
     
     def get_xpath_from_element(self,element:Control):
