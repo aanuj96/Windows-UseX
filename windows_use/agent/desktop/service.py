@@ -11,7 +11,9 @@ from psutil import Process
 from time import sleep
 from io import BytesIO
 from PIL import Image
+import win32process
 import subprocess
+import win32con
 import requests
 import ctypes
 import base64
@@ -185,19 +187,41 @@ class Desktop:
             response,status=self.execute_command(f'Start-Process shell:AppsFolder\\{appid}')
         return response,status
     
-    def switch_app(self,name:str):
+    def switch_app(self,name:str='',handle:int=None):
         apps={app.name:app for app in [self.desktop_state.active_app]+self.desktop_state.apps if app is not None}
-        matched_app:Optional[tuple[str,float]]=process.extractOne(name,list(apps.keys()),score_cutoff=70)
-        if matched_app is None:
-            return (f'Application {name.title()} not found.',1)
-        app_name,_=matched_app
-        app=apps.get(app_name)
-        if uia.IsIconic(app.handle):
-            uia.ShowWindow(app.handle, cmdShow=9)
-            return (f'{app_name.title()} restored from Minimized state.',0)
+        if not handle:
+            matched_app:Optional[tuple[str,float]]=process.extractOne(name,list(apps.keys()),score_cutoff=70)
+            if matched_app is None:
+                return (f'Application {name.title()} not found.',1)
+            app_name,_=matched_app
+            app=apps.get(app_name)
+            target_handle=app.handle
         else:
-            uia.SetForegroundWindow(app.handle)
-            return (f'Switched to {app_name.title()} window.',0)
+            target=None
+            for app in apps.values():
+                if app.handle==handle:
+                    target=app
+                    break
+            if target is None:
+                return (f'Application with handle {handle} not found.',1)
+            app_name=target.name
+            target_handle=target.handle
+
+        foreground_handle=uia.GetForegroundWindow()
+        foreground_thread,_=win32process.GetWindowThreadProcessId(foreground_handle)
+        target_thread,_=win32process.GetWindowThreadProcessId(target_handle)
+        win32process.AttachThreadInput(foreground_thread,target_thread,True)
+
+        if uia.IsIconic(target_handle):
+            uia.ShowWindow(target_handle, win32con.SW_RESTORE)
+            content=f'{app_name.title()} restored from Minimized state.'
+        else:
+            uia.SetForegroundWindow(target_handle)
+            content=f'Switched to {app_name.title()} window.'
+            
+        win32process.AttachThreadInput(foreground_thread,target_thread,False)
+        return content,0
+        
     
     def get_element_handle_from_label(self,label:int)->uia.Control:
         tree_state=self.desktop_state.tree_state
