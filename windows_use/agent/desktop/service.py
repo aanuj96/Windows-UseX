@@ -45,7 +45,7 @@ class Desktop:
         tree_state=self.tree.get_state(root=root)
         if use_vision:
             annotated_screenshot=self.tree.annotated_screenshot(tree_state.interactive_nodes,scale=0.5)
-            screenshot=self.screenshot_in_bytes(annotated_screenshot)
+            screenshot=self.screenshot_in_base64(annotated_screenshot)
         else:
             screenshot=None
         self.desktop_state=DesktopState(apps= apps,active_app=active_app,screenshot=screenshot,tree_state=tree_state)
@@ -330,7 +330,10 @@ class Desktop:
     def scrape(self,url:str)->str:
         response=requests.get(url,timeout=10)
         html=response.text
-        content=markdownify(html=html)
+        content=markdownify(html=html,heading_style='ATX',
+            strip=['script','style'],bullets="-",escape_astrisks=False,
+            escape_underscores=False,escape_misc=False,autolinks=False,
+            default_title=False,keep_inline_images_in=[])
         return content
     
     def get_app_size(self,control:uia.Control):
@@ -434,7 +437,7 @@ class Desktop:
         width, height = uia.GetScreenSize()
         return Size(width=width,height=height)
     
-    def screenshot_in_bytes(self,screenshot:PILImage)->bytes:
+    def screenshot_in_base64(self,screenshot:PILImage)->bytes:
         buffer=BytesIO()
         screenshot.save(buffer,format='PNG')
         img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
@@ -449,11 +452,9 @@ class Desktop:
     
     @contextmanager
     def auto_minimize(self):
-        SW_MINIMIZE=6
-        SW_RESTORE = 9
         try:
             handle = uia.GetForegroundWindow()
-            uia.ShowWindow(handle, SW_MINIMIZE)
+            uia.ShowWindow(handle, win32con.SW_MINIMIZE)
             yield
         finally:
-            uia.ShowWindow(handle, SW_RESTORE)
+            uia.ShowWindow(handle, win32con.SW_RESTORE)
