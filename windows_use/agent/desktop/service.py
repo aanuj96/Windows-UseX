@@ -330,10 +330,7 @@ class Desktop:
     def scrape(self,url:str)->str:
         response=requests.get(url,timeout=10)
         html=response.text
-        content=markdownify(html=html,heading_style='ATX',
-            strip=['script','style'],bullets="-",escape_astrisks=False,
-            escape_underscores=False,escape_misc=False,autolinks=False,
-            default_title=False,keep_inline_images_in=[])
+        content=markdownify(html=html)
         return content
     
     def get_app_size(self,control:uia.Control):
