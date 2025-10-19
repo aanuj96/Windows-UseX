@@ -33,6 +33,11 @@ class PlannerAI:
         
         system_prompt = """You are a Task Planner AI. Your job is to break down complex user requests into VERY SPECIFIC, ISOLATED steps that will be executed ONE AT A TIME by an AI agent.
 
+⚡ EXECUTION PRIORITY (Always prefer in this order):
+1. 🖥️ TERMINAL COMMANDS (PowerShell/CMD) - Most efficient for file ops, system tasks, app launching
+2. ⌨️ KEYBOARD SHORTCUTS - Fast, reliable, no GUI dependency (Win+R, Ctrl+C, Alt+Tab, etc.)
+3. 🖱️ GUI INTERACTIONS - Only when terminal/keyboard methods aren't available
+
 🎯 CRITICAL REQUIREMENTS:
 1. Each step must be a SINGLE, ATOMIC action - DO NOT combine multiple actions
 2. Each step will be executed INDEPENDENTLY - the agent will NOT see other steps
@@ -40,15 +45,25 @@ class PlannerAI:
 4. Break down even simple tasks into granular steps
 5. Each step should take only 1-3 actions maximum
 6. NEVER say "complete the task" or "finish" - be explicit about the exact action
+7. ALWAYS prefer Shell Tool + keyboard shortcuts over clicking buttons
 
-❌ BAD EXAMPLE:
+❌ BAD EXAMPLE (GUI-Heavy):
 "Open Notepad and type hello world" (This is TWO actions combined!)
 
-✅ GOOD EXAMPLE:
-Step 1: "Press Windows key to open Start menu"
-Step 2: "Type 'Notepad' in the search box"
-Step 3: "Click on Notepad application in search results"
-Step 4: "Type the text 'hello world' in Notepad"
+✅ BETTER EXAMPLE (Terminal/Keyboard-First):
+Step 1: "Use Shell Tool to run command: Start-Process notepad"
+Step 2: "Type the text 'hello world' in Notepad"
+
+✅ BEST EXAMPLE (Pure Terminal):
+Step 1: "Use Shell Tool: notepad | Out-Null; Start-Sleep -Seconds 2"
+Step 2: "Use Shortcut Tool: Win+R, then type 'notepad', then Enter"
+
+🎯 TERMINAL-FIRST EXAMPLES:
+- Opening apps: Shell Tool → `Start-Process chrome` OR Shortcut Tool → Win+R → type app name
+- File operations: Shell Tool → `Copy-Item`, `Move-Item`, `Remove-Item`, `New-Item`
+- Text manipulation: Shell Tool → `Set-Content`, `Add-Content`, `Get-Content`
+- Clipboard: Shortcut Tool → Ctrl+C (copy), Ctrl+V (paste), Ctrl+X (cut)
+- Navigation: Shortcut Tool → Win+E (Explorer), Win+S (Search), Alt+Tab (Switch apps)
 
 Guidelines:
 - Each step = ONE clear action only
@@ -75,10 +90,13 @@ Return your plan in the following JSON format:
 
 IMPORTANT: Always provide an alternative_approach for each step. This is a backup method if the primary approach fails.
 
-Examples of alternatives:
-- Primary: "Click button with label 49" → Alternative: "Use keyboard shortcut Win+S"
-- Primary: "Type in search box" → Alternative: "Use voice typing or paste from clipboard"
+Examples of alternatives (PREFER Terminal/Keyboard):
+- Primary: "Use Shell Tool: Start-Process notepad" → Alternative: "Press Win+R, type 'notepad', press Enter"
+- Primary: "Click button with label 49" → Alternative: "Use keyboard shortcut Win+S or Shell Tool command"
+- Primary: "Type in search box" → Alternative: "Use Shell Tool to pipe text or keyboard shortcut"
 - Primary: "Click File menu" → Alternative: "Use keyboard shortcut Alt+F"
+- Primary: "Click Save button" → Alternative: "Use Shortcut Tool: Ctrl+S"
+- Primary: "Navigate to folder" → Alternative: "Use Shell Tool: Set-Location or Win+E + type path"
 
 Only return valid JSON, nothing else."""
 
@@ -431,10 +449,16 @@ Begin execution now."""
         query = f"""🎯 EXECUTE AND VERIFY THIS SPECIFIC STEP ONLY
 {approach_note}
 
+⚡ EXECUTION PRIORITY (Use in this order):
+1. 🖥️ Shell Tool (PowerShell commands) - Most efficient and reliable
+2. ⌨️ Shortcut Tool (Keyboard shortcuts) - Fast and accurate
+3. 🖱️ GUI Tools (Click/Type) - Only if terminal/keyboard won't work
+
 ⚠️ CRITICAL REQUIREMENTS:
 1. Complete ONLY the action described below
-2. VERIFY the expected result was achieved
-3. Do NOT continue to other steps
+2. PREFER Shell Tool or Shortcut Tool over clicking when possible
+3. VERIFY the expected result was achieved
+4. Do NOT continue to other steps
 
 📌 YOUR TASK FOR THIS STEP:
 {action_description}
@@ -455,6 +479,19 @@ After executing the action and VERIFYING the expected result:
 - If FAILED or doesn't match expected → Report the failure
 - Do NOT proceed to any other actions
 {context}
+
+💡 COMMON POWERSHELL COMMANDS (Shell Tool):
+- Open app: Start-Process notepad | Start-Process chrome | Start-Process explorer
+- File ops: Copy-Item, Move-Item, Remove-Item, New-Item, Get-Content, Set-Content
+- Navigation: Set-Location "C:\\path" | Get-ChildItem | Test-Path
+- Text: "text" | Set-Content file.txt | Get-Content file.txt | Add-Content
+- System: Get-Process | Stop-Process | Get-Service | Start-Service
+
+⌨️ ESSENTIAL KEYBOARD SHORTCUTS (Shortcut Tool):
+- Apps: Win (Start), Win+R (Run), Win+E (Explorer), Win+S (Search), Win+D (Desktop)
+- Editing: Ctrl+C (Copy), Ctrl+V (Paste), Ctrl+X (Cut), Ctrl+Z (Undo), Ctrl+S (Save)
+- Navigation: Alt+Tab (Switch), Alt+F4 (Close), F2 (Rename), F5 (Refresh)
+- Menus: Alt+F (File), Alt+E (Edit), Alt+V (View), Ctrl+N (New), Ctrl+O (Open)
 
 IMPORTANT: You MUST verify that "{step['expected_outcome']}" actually happened before completing this step."""
         
@@ -537,12 +574,13 @@ def main():
         "  [green]1.[/green] Planner AI (step-by-step execution with verification)\n"
         "  [green]2.[/green] Direct Agent (single execution, no planning)\n"
         "  [green]3.[/green] Continuous Mode (plan once, execute multiple times)\n"
-        "  [green]4.[/green] Guided Single Execution (detailed plan → agent executes all at once)\n",
+        "  [green]4.[/green] Guided Single Execution (detailed plan → agent executes all at once)\n"
+        "  [green]5.[/green] ⚡ Terminal-First Mode (maximum keyboard/terminal usage, minimal GUI) ⚡\n",
         border_style="cyan",
         title="Welcome"
     ))
     
-    mode = input("\nSelect mode (1, 2, 3, or 4): ").strip()
+    mode = input("\nSelect mode (1, 2, 3, 4, or 5): ").strip()
     
     if mode == "1":
         # Use Planner AI (single execution)
@@ -691,6 +729,61 @@ Begin execution now."""
             else:
                 print(colored(f"\n✅ Execution Complete!\n", color='green', attrs=['bold']))
                 console.print(Markdown(result.content))
+    
+    elif mode == "5":
+        # Terminal-First Mode - Maximum keyboard/terminal usage, minimal GUI
+        user_query = input("\nEnter your task: ").strip()
+        
+        print(colored("\n⚡ TERMINAL-FIRST MODE ACTIVATED", color='green', attrs=['bold']))
+        print(colored("🖥️  Prioritizing: Shell Commands → Keyboard Shortcuts → GUI (last resort)\n", color='cyan'))
+        
+        # Add special instructions for terminal-first execution
+        agent.instructions.append(
+            "🎯 TERMINAL-FIRST EXECUTION MODE:\n"
+            "1. ALWAYS try Shell Tool (PowerShell) commands FIRST\n"
+            "2. Use Shortcut Tool (keyboard) for quick actions\n"
+            "3. Only use Click/Type tools if terminal/keyboard impossible\n\n"
+            "PREFER:\n"
+            "- Start-Process over Start Menu clicking\n"
+            "- Keyboard shortcuts over menu navigation\n"
+            "- PowerShell file operations over File Explorer\n"
+            "- Ctrl+C/V over right-click menus\n"
+            "- Win+R over searching Start Menu\n"
+        )
+        
+        # Create and display plan with terminal-first approach
+        plan_data = planner.create_plan(user_query)
+        planner.current_plan = plan_data['steps']
+        planner.display_plan(plan_data)
+        
+        console.print("\n" + "="*60)
+        console.print("[yellow]⚡ This plan emphasizes terminal commands and keyboard shortcuts[/yellow]")
+        console.print("[cyan]📊 Expected benefits: Faster execution, higher reliability, less GUI dependency[/cyan]")
+        
+        # Ask for configuration
+        console.print("\n" + "="*60)
+        print(colored("⚙️  Configuration:", color='yellow', attrs=['bold']))
+        max_steps_input = input("Max iterations per step (press Enter for 15, 0 for unlimited): ").strip()
+        
+        if max_steps_input == "0":
+            agent.max_steps = 100
+            print(colored(f"✅ Using unlimited mode (max 100 iterations per step)\n", color='green'))
+        elif max_steps_input.isdigit() and int(max_steps_input) > 0:
+            agent.max_steps = int(max_steps_input)
+            print(colored(f"✅ Using {agent.max_steps} max iterations per step\n", color='green'))
+        else:
+            agent.max_steps = 15
+            print(colored(f"✅ Using default (15 iterations per step)\n", color='green'))
+        
+        # Execute with terminal-first priority
+        console.print("\n" + "="*60)
+        proceed = input("\n🚀 Execute this terminal-first plan? (yes/no): ").strip().lower()
+        
+        if proceed in ['yes', 'y']:
+            planner.execute_plan(user_query, reuse_plan=True)
+        else:
+            print("Execution cancelled.")
+    
     else:
         print("Invalid mode selected.")
 

@@ -122,14 +122,20 @@ Windows-Use now includes an intelligent **Planner AI** that breaks down complex 
 - 🎯 Automatic task decomposition into actionable steps
 - 📊 Real-time progress tracking and monitoring
 - 🔄 Built-in error handling (retry, skip, abort)
+- 🧠 Intelligent retry with alternative approaches
+- 🆘 Fallback model for difficult tasks
 - 📈 Detailed execution summaries
-- 🎛️ Two modes: Planner AI (complex tasks) or Direct Agent (simple tasks)
+- ⚡ **Terminal-First Mode** for maximum efficiency (NEW!)
+- 🎛️ Five execution modes to fit any workflow
 
-**Usage:**
+**Execution Modes:**
 
 When you run `python main.py`, you'll be prompted to choose between:
-1. **Planner AI Mode** - For complex multi-step tasks
-2. **Direct Agent Mode** - For simple single-action tasks
+1. **Planner AI Mode** - Step-by-step execution with verification (best for complex tasks)
+2. **Direct Agent Mode** - Single execution, no planning (best for simple tasks)
+3. **Continuous Mode** - Plan once, execute multiple times (cost-efficient)
+4. **Guided Single Execution** - Detailed plan → agent executes all at once
+5. **⚡ Terminal-First Mode** - Maximum keyboard/terminal usage, minimal GUI (fastest!)
 
 **Example Planner AI Task:**
 ```
@@ -144,7 +150,22 @@ The Planner AI will:
 6. Close application
 ```
 
-See [PLANNER_GUIDE.md](PLANNER_GUIDE.md) for detailed documentation and examples.
+**Example Terminal-First Task (Mode 5):**
+```
+Task: "Create 10 text files named report1.txt to report10.txt"
+
+Traditional GUI: ~60 seconds (50+ clicks)
+Terminal-First: ~2 seconds! ⚡
+
+The agent will use:
+Shell Tool: 1..10 | ForEach-Object { "Report $_" | Set-Content "report$_.txt" }
+```
+
+**Documentation:**
+- [PLANNER_GUIDE.md](PLANNER_GUIDE.md) - Complete planner documentation
+- [TERMINAL_FIRST_MODE.md](TERMINAL_FIRST_MODE.md) - Terminal-First mode guide ⚡
+- [TERMINAL_COMMANDS_QUICK_REFERENCE.md](TERMINAL_COMMANDS_QUICK_REFERENCE.md) - PowerShell cheat sheet
+- [ALL_MODES_COMPARISON.md](ALL_MODES_COMPARISON.md) - Compare all execution modes
 
 ---
 
