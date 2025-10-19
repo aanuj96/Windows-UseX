@@ -114,6 +114,38 @@ You can use the following to run from a script:
 python main.py
 ```
 
+### 🧠 Planner AI Mode (NEW!)
+
+Windows-Use now includes an intelligent **Planner AI** that breaks down complex tasks into step-by-step instructions and coordinates their execution. Perfect for multi-step workflows!
+
+**Features:**
+- 🎯 Automatic task decomposition into actionable steps
+- 📊 Real-time progress tracking and monitoring
+- 🔄 Built-in error handling (retry, skip, abort)
+- 📈 Detailed execution summaries
+- 🎛️ Two modes: Planner AI (complex tasks) or Direct Agent (simple tasks)
+
+**Usage:**
+
+When you run `python main.py`, you'll be prompted to choose between:
+1. **Planner AI Mode** - For complex multi-step tasks
+2. **Direct Agent Mode** - For simple single-action tasks
+
+**Example Planner AI Task:**
+```
+Task: "Create a PowerPoint presentation about Python and save it to Desktop"
+
+The Planner AI will:
+1. Open PowerPoint
+2. Create new presentation
+3. Add title slide
+4. Add content slides
+5. Save to Desktop
+6. Close application
+```
+
+See [PLANNER_GUIDE.md](PLANNER_GUIDE.md) for detailed documentation and examples.
+
 ---
 
 ## 🎥 Demos
