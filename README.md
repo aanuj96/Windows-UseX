@@ -165,7 +165,8 @@ Shell Tool: 1..10 | ForEach-Object { "Report $_" | Set-Content "report$_.txt" }
 - [PLANNER_GUIDE.md](PLANNER_GUIDE.md) - Complete planner documentation
 - [TERMINAL_FIRST_MODE.md](TERMINAL_FIRST_MODE.md) - Terminal-First mode guide ⚡
 - [MODE_5_QUICK_GUIDE.md](MODE_5_QUICK_GUIDE.md) - Mode 5 V2.0 quick start ⚡
-- [TIMING_PERFORMANCE_GUIDE.md](TIMING_PERFORMANCE_GUIDE.md) - Performance timing & monitoring ⏱️ **NEW!**
+- [TIMING_PERFORMANCE_GUIDE.md](TIMING_PERFORMANCE_GUIDE.md) - Performance timing & monitoring ⏱️
+- [LOOP_DETECTION_TIMING_GUIDE.md](LOOP_DETECTION_TIMING_GUIDE.md) - Loop detection & per-iteration timing 🔴 **NEW!**
 - [TERMINAL_COMMANDS_QUICK_REFERENCE.md](TERMINAL_COMMANDS_QUICK_REFERENCE.md) - PowerShell cheat sheet
 - [ALL_MODES_COMPARISON.md](ALL_MODES_COMPARISON.md) - Compare all execution modes
 

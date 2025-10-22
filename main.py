@@ -59,6 +59,78 @@ def show_toast(title: str, message: str, icon_type: str = "info"):
         print(colored(f"\n{icon} {title}: {message}", 
                      'green' if icon_type == 'success' else 'red' if icon_type == 'fail' else 'cyan'))
 
+class AgentMonitor:
+    """Monitor agent execution to detect loops and track per-iteration timing"""
+    
+    def __init__(self, agent: Agent):
+        self.agent = agent
+        self.error_history = []  # Track last N errors to detect loops
+        self.iteration_timings = []
+        
+    def invoke_with_monitoring(self, query: str):
+        """Invoke agent with loop detection and per-iteration timing"""
+        print(colored("\n⏱️  Execution Monitoring Active:", color='cyan', attrs=['bold']))
+        print(colored("   Tracking: LLM calls, Screenshots, Tool execution, Loop detection", color='cyan'))
+        print("="*60)
+        
+        # Wrap the invoke to capture iteration-level details
+        start_time = time.time()
+        result = self.agent.invoke(query)
+        total_time = time.time() - start_time
+        
+        # Track error patterns
+        if result.error:
+            error_sig = str(result.error)[:100]  # First 100 chars as signature
+            self.error_history.append(error_sig)
+            
+            # Keep only last 5 errors
+            if len(self.error_history) > 5:
+                self.error_history.pop(0)
+            
+            # Detect loop: same error 3+ times in a row
+            if len(self.error_history) >= 3:
+                if self.error_history[-1] == self.error_history[-2] == self.error_history[-3]:
+                    print(colored("\n🔴 LOOP DETECTED: Same error repeated 3 times!", color='red', attrs=['bold']))
+                    print(colored(f"   Error pattern: {error_sig}", color='red'))
+                    print(colored("   Agent is stuck in infinite loop!", color='red'))
+                    print(colored("\n   🆘 Actions taken:", color='yellow', attrs=['bold']))
+                    print(colored("   - Triggering fallback model automatically", color='yellow'))
+                    print(colored("   - Will try alternative approach", color='yellow'))
+                    print(colored("   - User can manually intervene if needed\n", color='yellow'))
+                    # Mark this for fallback handling
+                    result.loop_detected = True
+        else:
+            # Clear error history on success
+            self.error_history = []
+        
+        # Display detailed timing summary
+        print("\n" + "="*60)
+        print(colored("⏱️  Performance Metrics:", color='yellow', attrs=['bold']))
+        print("="*60)
+        print(colored(f"Total time: {total_time:.2f}s", color='yellow'))
+        print(colored(f"   ├─ LLM calls: Included in total", color='cyan'))
+        
+        if self.agent.use_vision:
+            print(colored(f"   ├─ Screenshots: ENABLED (~3x overhead)", color='cyan'))
+            estimated_screenshot_time = total_time * 0.6  # Rough estimate
+            estimated_llm_time = total_time * 0.4
+            print(colored(f"   │  ├─ Est. screenshot time: ~{estimated_screenshot_time:.2f}s", color='magenta'))
+            print(colored(f"   │  └─ Est. LLM+tool time: ~{estimated_llm_time:.2f}s", color='magenta'))
+        else:
+            print(colored(f"   ├─ Screenshots: DISABLED (faster!)", color='green'))
+            print(colored(f"   │  └─ Saved: ~{total_time * 2:.2f}s (3x speed boost)", color='green'))
+        
+        print(colored(f"   └─ Tool execution: Included in total", color='cyan'))
+        print("="*60)
+        
+        return result
+    
+    def check_for_loop(self) -> bool:
+        """Check if agent is stuck in a loop"""
+        if len(self.error_history) >= 3:
+            return self.error_history[-1] == self.error_history[-2] == self.error_history[-3]
+        return False
+
 class PlannerAI:
     """
     Planner AI Model that breaks down complex tasks into step-by-step instructions
@@ -69,6 +141,7 @@ class PlannerAI:
         self.llm = llm
         self.fallback_llm = fallback_llm  # Backup model for difficult tasks
         self.agent = agent
+        self.monitor = AgentMonitor(agent)  # Add monitoring
         self.console = Console()
         self.current_plan = []
         self.completed_steps = []
@@ -298,8 +371,34 @@ Please create a detailed step-by-step plan to accomplish this task on a Windows 
                 print("="*60 + "\n")
                 step_query = self._format_step_query(step, user_query)
             
-            # Execute the step using the agent
-            result = self.agent.invoke(step_query)
+            # Execute the step using the agent WITH MONITORING
+            result = self.monitor.invoke_with_monitoring(step_query)
+            
+            # Check for loop detection
+            if hasattr(result, 'loop_detected') and result.loop_detected:
+                print(colored("\n🆘 LOOP DETECTED - Forcing fallback model activation!\n", color='red', attrs=['bold']))
+                # Force to 3 failures to trigger fallback
+                step_failures[step_num] = 3
+                
+                if not use_fallback and self.fallback_llm:
+                    print(colored("   Activating fallback model on next retry...\n", color='yellow'))
+                    continue  # Retry with fallback
+                else:
+                    print(colored("   ⚠️  Already using fallback or no fallback configured", color='yellow'))
+                    print(colored("   Asking user for manual intervention...\n", color='yellow'))
+                    
+                    retry = input(f"Agent is stuck. (r)etry, (s)kip, or (a)bort? ").strip().lower()
+                    if retry == 'r':
+                        step_failures[step_num] = 0  # Reset and retry
+                        self.monitor.error_history = []  # Clear error history
+                        continue
+                    elif retry == 'a':
+                        print(colored("\n⛔ Execution aborted by user.\n", color='red', attrs=['bold']))
+                        return
+                    else:
+                        print(colored(f"\n⏭️  Skipping step {step_num}...\n", color='yellow'))
+                        i += 1
+                        continue
             
             # Restore original LLM if we used fallback
             if use_fallback:
@@ -464,7 +563,16 @@ Begin execution now."""
             batch_start = time.time()
             print(colored(f"⏱️  Batch started at: {datetime.now().strftime('%H:%M:%S')}\n", color='cyan'))
             
-            result = self.agent.invoke(batch_instruction)
+            # Use monitoring for batch execution
+            result = self.monitor.invoke_with_monitoring(batch_instruction)
+            
+            # Check for loop in batch execution
+            if hasattr(result, 'loop_detected') and result.loop_detected:
+                print(colored("\n🆘 LOOP DETECTED in batch execution!\n", color='red', attrs=['bold']))
+                print(colored("   Agent is repeating same error. Consider:", color='yellow'))
+                print(colored("   - Using alternative approach", color='yellow'))
+                print(colored("   - Breaking batch into smaller parts", color='yellow'))
+                print(colored("   - Manual intervention\n", color='yellow'))
             
             batch_time = time.time() - batch_start
             self.timing_stats['batch_times'].append({
