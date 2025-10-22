@@ -9,8 +9,53 @@ from termcolor import colored
 import os
 import json
 import re
+import subprocess
 
 load_dotenv()
+
+def show_toast(title: str, message: str, icon_type: str = "info"):
+    """Show Windows toast notification using PowerShell"""
+    try:
+        # Map icon types to Windows notification icons
+        icon_map = {
+            "success": "✅",
+            "fail": "❌",
+            "info": "ℹ️"
+        }
+        icon = icon_map.get(icon_type, "ℹ️")
+        
+        # Use PowerShell to show a native Windows notification
+        ps_script = f"""
+        [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+        [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+        [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+        
+        $template = @"
+        <toast>
+            <visual>
+                <binding template="ToastText02">
+                    <text id="1">{icon} {title}</text>
+                    <text id="2">{message}</text>
+                </binding>
+            </visual>
+        </toast>
+"@
+        
+        $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+        $xml.LoadXml($template)
+        $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
+        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Windows-Use Agent").Show($toast)
+        """
+        
+        subprocess.run(
+            ["powershell", "-Command", ps_script],
+            capture_output=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+    except Exception as e:
+        # Fallback to console notification if toast fails
+        print(colored(f"\n{icon} {title}: {message}", 
+                     'green' if icon_type == 'success' else 'red' if icon_type == 'fail' else 'cyan'))
 
 class PlannerAI:
     """
@@ -331,7 +376,7 @@ Please create a detailed step-by-step plan to accomplish this task on a Windows 
         # Display final summary
         self._display_summary()
     
-    def execute_plan_in_batches(self, user_query: str, num_batches: int):
+    def execute_plan_in_batches(self, user_query: str, num_batches: int, show_screenshots: bool = False):
         """Execute the plan divided into batches, each batch executed at once"""
         
         if not self.current_plan:
@@ -348,6 +393,13 @@ Please create a detailed step-by-step plan to accomplish this task on a Windows 
         
         print("\n" + "="*60)
         print(colored(f"\n🚀 Executing {total_steps} steps in {num_batches} batches...\n", color='green', attrs=['bold']))
+        
+        # Show screenshot info
+        vision_status = "📸 Screenshots ENABLED" if self.agent.use_vision else "🚫 Screenshots DISABLED (faster execution)"
+        print(colored(f"{vision_status}\n", color='cyan'))
+        
+        if show_screenshots:
+            print(colored(f"📊 Screenshot info will be displayed for each iteration\n", color='yellow'))
         
         batch_num = 0
         for i in range(0, total_steps, batch_size):
@@ -388,6 +440,12 @@ Begin execution now."""
             
             # Execute the batch
             print(colored(f"⚡ Executing {len(batch_steps)} steps with unlimited iterations...\n", color='green'))
+            
+            # Show screenshot status for each execution
+            if show_screenshots:
+                screenshot_msg = "Taking screenshots each iteration" if self.agent.use_vision else "NO screenshots (text-only mode)"
+                print(colored(f"   📸 {screenshot_msg}\n", color='cyan'))
+            
             result = self.agent.invoke(batch_instruction)
             
             # Record the execution
@@ -406,7 +464,15 @@ Begin execution now."""
                     self.completed_steps.append(step)
             
             if result.error:
-                print(colored(f"\n❌ Batch {batch_num} Failed: {result.error}\n", color='red', attrs=['bold']))
+                error_msg = f"Batch {batch_num} Failed: {result.error}"
+                print(colored(f"\n❌ {error_msg}\n", color='red', attrs=['bold']))
+                
+                # Show toast notification for failure
+                show_toast(
+                    f"Batch {batch_num}/{num_batches} Failed",
+                    f"Steps {i+1}-{min(i+batch_size, total_steps)} failed",
+                    "fail"
+                )
                 
                 # Ask if should continue
                 retry = input(f"Would you like to (r)etry this batch, (s)kip to next, or (a)bort? ").strip().lower()
@@ -423,7 +489,15 @@ Begin execution now."""
                     print(colored(f"\n⏭️  Skipping to next batch...\n", color='yellow'))
                     continue
             else:
-                print(colored(f"\n✅ Batch {batch_num} Completed Successfully ({len(batch_steps)} steps)\n", color='green', attrs=['bold']))
+                success_msg = f"Batch {batch_num} Completed Successfully ({len(batch_steps)} steps)"
+                print(colored(f"\n✅ {success_msg}\n", color='green', attrs=['bold']))
+                
+                # Show toast notification for success
+                show_toast(
+                    f"Batch {batch_num}/{num_batches} Complete! ✅",
+                    f"Steps {i+1}-{min(i+batch_size, total_steps)} successful",
+                    "success"
+                )
         
         # Display final summary
         self._display_summary()
@@ -653,7 +727,7 @@ def main():
             
             if use_batches:
                 # Batch execution mode
-                planner.execute_plan_in_batches(user_query, num_batches)
+                planner.execute_plan_in_batches(user_query, num_batches, show_screenshots=False)
             else:
                 # Regular step-by-step execution
                 planner.execute_plan(user_query, reuse_plan=True)
@@ -731,11 +805,12 @@ Begin execution now."""
                 console.print(Markdown(result.content))
     
     elif mode == "5":
-        # Terminal-First Mode - Maximum keyboard/terminal usage, minimal GUI
+        # Terminal-First Mode - Maximum keyboard/terminal usage, minimal GUI with BATCH EXECUTION
         user_query = input("\nEnter your task: ").strip()
         
         print(colored("\n⚡ TERMINAL-FIRST MODE ACTIVATED", color='green', attrs=['bold']))
-        print(colored("🖥️  Prioritizing: Shell Commands → Keyboard Shortcuts → GUI (last resort)\n", color='cyan'))
+        print(colored("🖥️  Prioritizing: Shell Commands → Keyboard Shortcuts → GUI (last resort)", color='cyan'))
+        print(colored("⚡ FAST BATCH EXECUTION: Unlimited iterations per batch\n", color='green', attrs=['bold']))
         
         # Add special instructions for terminal-first execution
         agent.instructions.append(
@@ -760,27 +835,63 @@ Begin execution now."""
         console.print("[yellow]⚡ This plan emphasizes terminal commands and keyboard shortcuts[/yellow]")
         console.print("[cyan]📊 Expected benefits: Faster execution, higher reliability, less GUI dependency[/cyan]")
         
-        # Ask for configuration
+        # Ask for configuration - BATCH EXECUTION STYLE
         console.print("\n" + "="*60)
         print(colored("⚙️  Configuration:", color='yellow', attrs=['bold']))
-        max_steps_input = input("Max iterations per step (press Enter for 15, 0 for unlimited): ").strip()
         
-        if max_steps_input == "0":
-            agent.max_steps = 100
-            print(colored(f"✅ Using unlimited mode (max 100 iterations per step)\n", color='green'))
-        elif max_steps_input.isdigit() and int(max_steps_input) > 0:
-            agent.max_steps = int(max_steps_input)
-            print(colored(f"✅ Using {agent.max_steps} max iterations per step\n", color='green'))
+        total_steps = len(planner.current_plan)
+        
+        # Show screenshot status
+        vision_status = "📸 Screenshots ENABLED" if agent.use_vision else "🚫 Screenshots DISABLED (faster!)"
+        print(colored(f"{vision_status}", color='cyan'))
+        
+        batch_input = input(f"Divide {total_steps} steps into how many execution batches? (press Enter for {total_steps}, 0 for single batch): ").strip()
+        
+        # Set agent to unlimited for batch execution (like Mode 4)
+        agent.max_steps = 100  # Unlimited iterations per batch
+        
+        # Determine batch execution mode
+        use_batches = True
+        num_batches = total_steps  # Default: one batch per step
+        
+        if batch_input == "0":
+            num_batches = 1
+            print(colored(f"\n✅ Single batch mode: All {total_steps} steps in ONE execution", color='green'))
+            print(colored(f"   ♾️  Unlimited iterations to complete entire task\n", color='cyan'))
+        elif batch_input.isdigit() and int(batch_input) > 0:
+            num_batches = int(batch_input)
+            steps_per_batch = max(1, total_steps // num_batches)
+            print(colored(f"\n✅ Dividing {total_steps} steps into {num_batches} execution batches", color='green'))
+            print(colored(f"   ~{steps_per_batch} steps per batch, ♾️ unlimited iterations per batch\n", color='cyan'))
         else:
-            agent.max_steps = 15
-            print(colored(f"✅ Using default (15 iterations per step)\n", color='green'))
+            print(colored(f"\n✅ Default: {total_steps} batches (1 step per batch)", color='green'))
+            print(colored(f"   ♾️  Unlimited iterations per step\n", color='cyan'))
         
-        # Execute with terminal-first priority
+        # Ask about showing screenshot info
+        show_screenshot_info = input("Show screenshot status for each iteration? (y/n, default: y): ").strip().lower()
+        show_screenshots = show_screenshot_info != 'n'
+        
+        # Execute with terminal-first priority using batch mode
         console.print("\n" + "="*60)
         proceed = input("\n🚀 Execute this terminal-first plan? (yes/no): ").strip().lower()
         
         if proceed in ['yes', 'y']:
-            planner.execute_plan(user_query, reuse_plan=True)
+            # Show starting toast
+            show_toast(
+                "Terminal-First Mode Started! ⚡",
+                f"Executing {total_steps} steps in {num_batches} batches",
+                "info"
+            )
+            
+            # Execute in batches with toast notifications
+            planner.execute_plan_in_batches(user_query, num_batches, show_screenshots)
+            
+            # Show completion toast
+            show_toast(
+                "Execution Complete! 🎉",
+                f"All batches finished",
+                "success"
+            )
         else:
             print("Execution cancelled.")
     
