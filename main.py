@@ -10,6 +10,8 @@ import os
 import json
 import re
 import subprocess
+import time
+from datetime import datetime
 
 load_dotenv()
 
@@ -72,6 +74,12 @@ class PlannerAI:
         self.completed_steps = []
         self.execution_history = []
         self.using_fallback = False
+        self.timing_stats = {
+            'planner_llm_time': 0,
+            'agent_execution_time': 0,
+            'total_time': 0,
+            'batch_times': []
+        }
         
     def create_plan(self, user_query: str) -> list[dict]:
         """Create a detailed step-by-step plan for the user's query"""
@@ -156,7 +164,13 @@ Please create a detailed step-by-step plan to accomplish this task on a Windows 
             HumanMessage(content=user_prompt)
         ]
         
+        # Track planner LLM time
+        planner_start = time.time()
         response = self.llm.invoke(messages)
+        planner_time = time.time() - planner_start
+        self.timing_stats['planner_llm_time'] = planner_time
+        
+        print(colored(f"⏱️  Planner LLM: {planner_time:.2f}s\n", color='yellow'))
         
         try:
             # Extract JSON from the response
@@ -446,7 +460,25 @@ Begin execution now."""
                 screenshot_msg = "Taking screenshots each iteration" if self.agent.use_vision else "NO screenshots (text-only mode)"
                 print(colored(f"   📸 {screenshot_msg}\n", color='cyan'))
             
+            # Track batch execution time
+            batch_start = time.time()
+            print(colored(f"⏱️  Batch started at: {datetime.now().strftime('%H:%M:%S')}\n", color='cyan'))
+            
             result = self.agent.invoke(batch_instruction)
+            
+            batch_time = time.time() - batch_start
+            self.timing_stats['batch_times'].append({
+                'batch_num': batch_num,
+                'steps': len(batch_steps),
+                'time': batch_time,
+                'success': result.error is None
+            })
+            
+            # Display timing breakdown
+            print(colored(f"\n⏱️  Batch {batch_num} Timing:", color='yellow', attrs=['bold']))
+            print(colored(f"   Total time: {batch_time:.2f}s", color='yellow'))
+            print(colored(f"   Avg per step: {batch_time/len(batch_steps):.2f}s", color='yellow'))
+            print(colored(f"   Screenshot mode: {'ENABLED' if self.agent.use_vision else 'DISABLED'}", color='yellow'))
             
             # Record the execution
             for step in batch_steps:
@@ -572,7 +604,7 @@ IMPORTANT: You MUST verify that "{step['expected_outcome']}" actually happened b
         return query
     
     def _display_summary(self):
-        """Display execution summary"""
+        """Display execution summary with timing statistics"""
         
         successful = sum(1 for record in self.execution_history if record['success'])
         total = len(self.execution_history)
@@ -584,6 +616,48 @@ IMPORTANT: You MUST verify that "{step['expected_outcome']}" actually happened b
         print(f"Successful: {colored(str(successful), 'green')}")
         print(f"Failed: {colored(str(total - successful), 'red')}")
         print(f"Success Rate: {colored(f'{(successful/total*100):.1f}%', 'yellow')}")
+        
+        # Display timing statistics
+        print("\n" + "="*60)
+        print(colored("\n⏱️  Performance Breakdown\n", color='yellow', attrs=['bold']))
+        print("="*60)
+        
+        # Planner LLM time
+        if self.timing_stats['planner_llm_time'] > 0:
+            print(colored(f"\n🧠 Planner LLM Time: {self.timing_stats['planner_llm_time']:.2f}s", color='cyan'))
+        
+        # Batch execution times
+        if self.timing_stats['batch_times']:
+            print(colored(f"\n⚡ Agent Execution Times:", color='green', attrs=['bold']))
+            total_exec_time = 0
+            for batch_info in self.timing_stats['batch_times']:
+                status = "✅" if batch_info['success'] else "❌"
+                print(colored(f"   {status} Batch {batch_info['batch_num']}: {batch_info['time']:.2f}s ({batch_info['steps']} steps, avg {batch_info['time']/batch_info['steps']:.2f}s/step)", color='yellow'))
+                total_exec_time += batch_info['time']
+            
+            self.timing_stats['agent_execution_time'] = total_exec_time
+            print(colored(f"\n   Total execution: {total_exec_time:.2f}s", color='green', attrs=['bold']))
+        
+        # Total time
+        total_time = self.timing_stats['planner_llm_time'] + self.timing_stats['agent_execution_time']
+        self.timing_stats['total_time'] = total_time
+        
+        print(colored(f"\n🏁 Total Time: {total_time:.2f}s", color='cyan', attrs=['bold']))
+        
+        # Time breakdown percentages
+        if total_time > 0:
+            planner_pct = (self.timing_stats['planner_llm_time'] / total_time) * 100
+            exec_pct = (self.timing_stats['agent_execution_time'] / total_time) * 100
+            
+            print(colored(f"\n📊 Time Distribution:", color='magenta'))
+            print(colored(f"   Planner: {planner_pct:.1f}% ({self.timing_stats['planner_llm_time']:.2f}s)", color='cyan'))
+            print(colored(f"   Execution: {exec_pct:.1f}% ({self.timing_stats['agent_execution_time']:.2f}s)", color='green'))
+        
+        # Screenshot info
+        screenshot_status = "ENABLED" if self.agent.use_vision else "DISABLED"
+        screenshot_impact = " (saves ~3x time)" if not self.agent.use_vision else " (slower but visual verification)"
+        print(colored(f"\n📸 Screenshots: {screenshot_status}{screenshot_impact}", color='yellow'))
+        
         print("\n" + "="*60 + "\n")
         
         # Display detailed results
